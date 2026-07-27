@@ -8,6 +8,7 @@ let currentDialogue = [];
 let currentVideoUrl = null;
 let batchDirectoryHandle = null;
 let batchRunning = false;
+let selectedCueIndex = 0;
 
 function toast(message) {
   const node = $('#toast'); node.textContent = message; node.classList.add('show');
@@ -35,7 +36,7 @@ function loadConfig() {
   }
   modelSelect.value = savedModel;
   const storedScriptModel = localStorage.getItem('scriptModel') || '';
-  const scriptModel = storedScriptModel.toLowerCase().includes('gpt') ? storedScriptModel : '';
+  const scriptModel = /gpt|claude/i.test(storedScriptModel) ? storedScriptModel : '';
   if (storedScriptModel && !scriptModel) localStorage.removeItem('scriptModel');
   const scriptSelect = $('#scriptModel');
   if (scriptModel && ![...scriptSelect.options].some((item) => item.value === scriptModel)) {
@@ -56,7 +57,7 @@ $('#routerForm').addEventListener('submit', (event) => {
   localStorage.setItem('textModel', $('#textModel').value);
   localStorage.setItem('scriptModel', $('#scriptModel').value);
   localStorage.setItem('whisperModel', $('#whisperModel').value);
-  setRouterStatus('Đã lưu cấu hình Gemini, GPT và Whisper thành công.', 'success');
+  setRouterStatus('Đã lưu cấu hình Gemini, model kịch bản và Whisper thành công.', 'success');
   setTimeout(() => { dialog.close(); toast('Đã lưu kết nối 9Router'); }, 650);
 });
 
@@ -81,22 +82,22 @@ $('#probeRouter').addEventListener('click', async () => {
     availableModels.forEach((model) => select.add(new Option(`[${model.provider}] ${model.id}`, model.id)));
     if (availableModels.some((model) => model.id === previous)) select.value = previous;
     const scriptSelect = $('#scriptModel'); const previousScript = localStorage.getItem('scriptModel');
-    const gptModels = payload.models.filter((model) => model.id.toLowerCase().includes('gpt'));
-    const scriptPriority = { cx: 0, gh: 1, openai: 9 };
-    gptModels.sort((a, b) => (scriptPriority[a.provider] ?? 5) - (scriptPriority[b.provider] ?? 5));
-    scriptSelect.innerHTML = '<option value="">Chọn GPT đã được auth</option>';
-    gptModels.forEach((model) => scriptSelect.add(new Option(`[${model.provider}] ${model.id}`, model.id)));
-    if (gptModels.some((model) => model.id === previousScript)) scriptSelect.value = previousScript;
-    setRouterStatus(`Kết nối thành công: ${geminiModels.length} Gemini · ${gptModels.length} GPT.`, 'success');
+    const scriptModels = payload.models.filter((model) => /gpt|claude/i.test(model.id));
+    const scriptPriority = { cx: 0, gh: 1, claude: 2, anthropic: 3, openai: 9 };
+    scriptModels.sort((a, b) => (scriptPriority[a.provider] ?? 5) - (scriptPriority[b.provider] ?? 5));
+    scriptSelect.innerHTML = '<option value="">Chọn GPT hoặc Claude đã được auth</option>';
+    scriptModels.forEach((model) => scriptSelect.add(new Option(`[${model.provider}] ${model.id}`, model.id)));
+    if (scriptModels.some((model) => model.id === previousScript)) scriptSelect.value = previousScript;
+    setRouterStatus(`Kết nối thành công: ${geminiModels.length} Gemini · ${scriptModels.length} model kịch bản.`, 'success');
   } catch (error) { setRouterStatus(error.message, 'error'); }
   finally { button.disabled = false; button.textContent = 'TẢI DANH SÁCH MODEL'; }
 });
 
 $('#testRouterModel').addEventListener('click', async () => {
   const models = [$('#textModel').value, $('#scriptModel').value]; const button = $('#testRouterModel');
-  if (models.some((model) => !model)) { setRouterStatus('Hãy chọn cả Gemini và GPT trước khi test.', 'error'); return; }
+  if (models.some((model) => !model)) { setRouterStatus('Hãy chọn Gemini và model viết kịch bản trước khi test.', 'error'); return; }
   button.disabled = true; button.textContent = 'ĐANG TEST MODEL...';
-  setRouterStatus('Đang gửi yêu cầu thử tới Gemini và GPT...', 'loading');
+  setRouterStatus('Đang gửi yêu cầu thử tới Gemini và model viết kịch bản...', 'loading');
   try {
     for (const model of models) {
       const response = await fetch('/api/router/test-model', {
@@ -106,9 +107,9 @@ $('#testRouterModel').addEventListener('click', async () => {
       const payload = await response.json();
       if (!response.ok) throw new Error(`${model}: ${payload.detail || 'test thất bại'}`);
     }
-    setRouterStatus('Gemini và GPT đều hoạt động. Bạn có thể lưu cấu hình.', 'success');
+    setRouterStatus('Gemini và model viết kịch bản đều hoạt động. Bạn có thể lưu cấu hình.', 'success');
   } catch (error) { setRouterStatus(error.message, 'error'); }
-  finally { button.disabled = false; button.textContent = 'TEST GEMINI & GPT'; }
+  finally { button.disabled = false; button.textContent = 'TEST 2 MODEL'; }
 });
 
 document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
@@ -347,7 +348,7 @@ form.addEventListener('submit', async (event) => {
   if (!textModel) { loadConfig(); dialog.showModal(); toast('Hãy tải và chọn text model'); resetButton(); return; }
   data.set('text_model', textModel);
   const scriptModel = localStorage.getItem('scriptModel');
-  if (!scriptModel) { loadConfig(); dialog.showModal(); toast('Hãy chọn GPT viết kịch bản'); resetButton(); return; }
+  if (!scriptModel) { loadConfig(); dialog.showModal(); toast('Hãy chọn GPT hoặc Claude viết kịch bản'); resetButton(); return; }
   data.set('script_model', scriptModel);
   const savedWhisper = localStorage.getItem('whisperModel');
   data.set('local_whisper_model', ['base', 'small', 'medium'].includes(savedWhisper) ? savedWhisper : 'small');
@@ -404,6 +405,7 @@ async function updateJob(jobId) {
       $('#scriptEditor').value = job.artifacts.script || '';
       currentDialogue = job.artifacts.dialogue || [];
       buildTimeline(currentDialogue);
+      buildCueEditor();
       updateWordCount();
       $('#regenerateButton').disabled = false;
       $('#regenerateButton').innerHTML = 'TẠO LẠI TỪ KỊCH BẢN NÀY <span>↻</span>';
@@ -437,13 +439,57 @@ function buildTimeline(lines) {
 }
 
 function selectCue(index, cue) {
+  selectedCueIndex = index;
   document.querySelectorAll('.cue-block').forEach((item) => item.classList.remove('active')); cue.classList.add('active');
   const video = $('#resultVideo'); video.currentTime = currentDialogue[index].start; video.play();
   document.querySelector('[data-editor-tab="content"]').click();
-  const textarea = $('#scriptEditor'); const lines = textarea.value.split('\n');
-  const start = lines.slice(0, index).reduce((sum, line) => sum + line.length + 1, 0);
-  textarea.focus(); textarea.setSelectionRange(start, start + (lines[index]?.length || 0));
+  document.querySelectorAll('.cue-editor-row').forEach((item, rowIndex) => item.classList.toggle('active', rowIndex === index));
+  document.querySelectorAll('.cue-editor-row')[index]?.scrollIntoView({block: 'nearest'});
 }
+
+function voiceOptions(selected) {
+  return [...$('#ttsVoice').options].filter((option) => option.dataset.lang === $('#targetLanguage').value)
+    .map((option) => `<option value="${option.value}" data-speaker="${option.dataset.speaker || ''}" ${option.value === selected ? 'selected' : ''}>${option.textContent}</option>`).join('');
+}
+
+function syncScriptFromCues() {
+  $('#scriptEditor').value = currentDialogue.map((line) => line.translation).join('\n');
+  updateWordCount(); buildTimeline(currentDialogue);
+}
+
+function buildCueEditor() {
+  const list = $('#cueEditorList'); list.innerHTML = '';
+  currentDialogue.forEach((line, index) => {
+    const row = document.createElement('div'); row.className = `cue-editor-row${index === selectedCueIndex ? ' active' : ''}`;
+    row.innerHTML = `<button type="button" class="cue-index">${String(index + 1).padStart(3, '0')}</button><div class="cue-time"><label>IN<input type="number" min="0" step="0.1" value="${line.start.toFixed(2)}"></label><label>OUT<input type="number" min="0.4" step="0.1" value="${line.end.toFixed(2)}"></label></div><textarea>${line.translation}</textarea><select>${voiceOptions(line.voice || $('#ttsVoice').value)}</select>`;
+    const [startInput, endInput] = row.querySelectorAll('input'); const text = row.querySelector('textarea'); const voice = row.querySelector('select');
+    row.querySelector('.cue-index').addEventListener('click', () => selectCue(index, document.querySelectorAll('.cue-block')[index]));
+    startInput.addEventListener('change', () => { line.start = Number(startInput.value); syncScriptFromCues(); });
+    endInput.addEventListener('change', () => { line.end = Number(endInput.value); syncScriptFromCues(); });
+    text.addEventListener('input', () => { line.translation = text.value; syncScriptFromCues(); });
+    voice.addEventListener('change', () => { line.voice = voice.value; line.speaker = Number(voice.selectedOptions[0].dataset.speaker) || null; });
+    list.appendChild(row);
+  });
+  syncScriptFromCues();
+}
+
+$('#addCueButton').addEventListener('click', () => {
+  const previous = currentDialogue[selectedCueIndex] || currentDialogue.at(-1);
+  const start = previous ? previous.end : 0; const cue = {id: Date.now(), start, end: start + 2, source: '', translation: 'Nội dung mới', voice: $('#ttsVoice').value, speaker: null};
+  currentDialogue.splice(selectedCueIndex + 1, 0, cue); selectedCueIndex += 1; buildCueEditor();
+});
+
+$('#splitCueButton').addEventListener('click', () => {
+  const cue = currentDialogue[selectedCueIndex]; if (!cue || cue.end - cue.start < 0.8) { toast('Cue quá ngắn để tách'); return; }
+  const midpoint = (cue.start + cue.end) / 2; const words = cue.translation.split(/\s+/); const split = Math.max(1, Math.floor(words.length / 2));
+  const next = {...cue, id: Date.now(), start: midpoint, translation: words.slice(split).join(' ') || cue.translation};
+  cue.end = midpoint; cue.translation = words.slice(0, split).join(' '); currentDialogue.splice(selectedCueIndex + 1, 0, next); buildCueEditor();
+});
+
+$('#deleteCueButton').addEventListener('click', () => {
+  if (currentDialogue.length <= 1) { toast('Timeline phải còn ít nhất một cue'); return; }
+  currentDialogue.splice(selectedCueIndex, 1); selectedCueIndex = Math.max(0, selectedCueIndex - 1); buildCueEditor();
+});
 
 function formatTime(seconds) {
   const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60);
@@ -481,13 +527,14 @@ $('#applyEditorButton').addEventListener('click', async () => {
 });
 
 $('#regenerateButton').addEventListener('click', async () => {
-  const script = $('#scriptEditor').value.trim();
+  const script = currentDialogue.map((line) => line.translation).join(' ').trim();
   const words = script.split(/\s+/).filter(Boolean).length;
   if (!currentJobId || words < 10 || words > 3000) { toast('Kịch bản cần từ 10 đến 3000 từ'); return; }
   const button = $('#regenerateButton'); button.disabled = true; button.textContent = 'ĐANG TẠO LẠI...';
-  const data = new FormData(); data.set('script', script);
   try {
-    const response = await fetch(`/api/jobs/${currentJobId}/regenerate`, { method: 'POST', body: data });
+    const response = await fetch(`/api/jobs/${currentJobId}/timeline`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({cues: currentDialogue})
+    });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || 'Không thể tạo lại video');
     $('#resultGrid').hidden = true; $('#errorBox').hidden = true;

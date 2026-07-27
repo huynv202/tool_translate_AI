@@ -19,7 +19,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from .config import Settings
-from .dialogue import apply_script, load_dialogue, save_dialogue
+from .dialogue import DialogueLine, apply_script, dialogue_script, load_dialogue, save_dialogue
 from .errors import PipelineError
 from .local_stt import normalize_model_name
 from .pipeline import PipelineOptions, execute
@@ -34,7 +34,7 @@ STAGES = [
     "Lay video nguon",
     "Trich xuat audio",
     "Nhan dang tieng Trung",
-    "Dich Gemini va bien tap GPT",
+    "Dich va bien tap AI",
     "Tao giong doc",
     "Tao phu de",
     "Render video",
@@ -142,6 +142,19 @@ class EditorSettings(BaseModel):
     logo_position: str = "top-right"
     logo_width: float = 0.16
     logo_opacity: float = 0.9
+
+
+class TimelineCue(BaseModel):
+    id: int
+    start: float
+    end: float
+    translation: str
+    voice: str | None = None
+    speaker: int | None = None
+
+
+class TimelineEdit(BaseModel):
+    cues: list[TimelineCue]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -362,6 +375,57 @@ def retry_job(job_id: str, background: BackgroundTasks) -> dict[str, str]:
     return {"job_id": job.id}
 
 
+@app.post("/api/jobs/{job_id}/timeline", status_code=202)
+def update_timeline(
+    job_id: str, editor: TimelineEdit, background: BackgroundTasks
+) -> dict[str, str]:
+    job = store.get(job_id)
+    if job.status == "running":
+        raise HTTPException(status_code=409, detail="Job dang xu ly")
+    if not job.work_dir or not job.options or not job.settings:
+        raise HTTPException(status_code=409, detail="Job khong con du lieu timeline")
+    if not editor.cues or len(editor.cues) > 5000:
+        raise HTTPException(status_code=422, detail="Timeline phai co tu 1 den 5000 cue")
+    source_path = job.work_dir / "dialogue.translated.json"
+    source_by_id = {line.id: line.source for line in load_dialogue(source_path)}
+    lines: list[DialogueLine] = []
+    previous_end = 0.0
+    for index, cue in enumerate(editor.cues, start=1):
+        text = cue.translation.strip()
+        if not text:
+            raise HTTPException(status_code=422, detail=f"Cue {index} dang rong")
+        if cue.start < 0 or cue.end - cue.start < 0.4 or cue.start < previous_end:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Timeline cue {index} bi chong lan hoac ngan hon 0.4 giay",
+            )
+        lines.append(
+            DialogueLine(
+                id=index,
+                start=cue.start,
+                end=cue.end,
+                source=source_by_id.get(cue.id, ""),
+                translation=text,
+                voice=cue.voice,
+                speaker=cue.speaker,
+            )
+        )
+        previous_end = cue.end
+    save_dialogue(lines, source_path)
+    (job.work_dir / "script.translated.txt").write_text(
+        dialogue_script(lines), encoding="utf-8"
+    )
+    for filename in ("voiceover.mp3", "voiceover.srt", "voice-filter.txt"):
+        (job.work_dir / filename).unlink(missing_ok=True)
+    if job.output:
+        job.output.unlink(missing_ok=True)
+    for stage in ("Tao giong doc", "Tao phu de", "Render video"):
+        job.stages[stage] = "pending"
+    job.error = None
+    background.add_task(_run_job, job, job.options, job.settings)
+    return {"job_id": job.id}
+
+
 @app.post("/api/jobs/{job_id}/render-settings", status_code=202)
 def update_render_settings(
     job_id: str, editor: EditorSettings, background: BackgroundTasks
@@ -449,8 +513,10 @@ async def create_job(
         raise HTTPException(status_code=422, detail="Thong so logo nam ngoai pham vi cho phep")
     if "gemini" not in text_model.lower():
         raise HTTPException(status_code=422, detail="Hay chon mot model Gemini de dich subtitle")
-    if "gpt" not in script_model.lower():
-        raise HTTPException(status_code=422, detail="Hay chon mot model GPT de viet kich ban")
+    if not any(name in script_model.lower() for name in ("gpt", "claude")):
+        raise HTTPException(
+            status_code=422, detail="Hay chon mot model GPT hoac Claude de viet kich ban"
+        )
 
     job = store.create()
     job_dir = JOBS_ROOT / job.id

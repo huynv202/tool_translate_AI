@@ -49,6 +49,23 @@ def test_job_requires_gemini_model() -> None:
     assert "Gemini" in response.json()["detail"]
 
 
+def test_job_accepts_claude_as_script_model(monkeypatch) -> None:
+    from viet_transform import web
+
+    monkeypatch.setattr(web, "_run_job", lambda *args, **kwargs: None)
+    response = client.post(
+        "/api/jobs",
+        data={
+            "source_url": "https://example.com/video.mp4",
+            "router_api_key": "test-key",
+            "router_base_url": "http://localhost:20128/v1",
+            "text_model": "gemini-test-model",
+            "script_model": "claude-test-model",
+        },
+    )
+    assert response.status_code == 202
+
+
 def test_chunked_upload_is_reassembled(monkeypatch, tmp_path) -> None:
     from types import SimpleNamespace
 

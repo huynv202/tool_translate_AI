@@ -16,7 +16,8 @@ class RenderOptions:
     zoom: float = 1.06
     flip: bool = True
     music_volume: float = 0.12
-    crf: int = 20
+    crf: int = 23
+    preset: str = "veryfast"
     watermark_position: str = "top-left"
     logo_position: str = "top-right"
     logo_width: float = 0.16
@@ -108,8 +109,8 @@ def render(
     command += [
         "-filter_complex",
         f"[0:v]{','.join(video_filters)}[{video_output}]{logo_filter};{audio_filter}",
-        "-map", "[vout]", "-map", "[aout]", "-c:v", "libx264", "-preset", "medium",
-        "-crf", str(options.crf), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+        "-map", "[vout]", "-map", "[aout]", "-c:v", "libx264", "-preset", options.preset,
+        "-crf", str(options.crf), "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
         "-shortest", str(output),
     ]
     output.parent.mkdir(parents=True, exist_ok=True)

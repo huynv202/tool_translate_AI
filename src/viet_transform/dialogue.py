@@ -15,6 +15,8 @@ class DialogueLine:
     end: float
     source: str
     translation: str = ""
+    voice: str | None = None
+    speaker: int | None = None
 
     @property
     def duration(self) -> float:
@@ -53,18 +55,10 @@ def apply_script(lines: list[DialogueLine], script: str) -> list[DialogueLine]:
 
 
 def dialogue_srt(lines: list[DialogueLine]) -> str:
-    cues: list[tuple[float, float, str]] = []
-    for line in lines:
-        words = line.translation.split()
-        chunks = [words[index : index + 7] for index in range(0, len(words), 7)] or [[]]
-        slot = line.duration / len(chunks)
-        for index, chunk in enumerate(chunks):
-            start = line.start + (index * slot)
-            end = min(line.end, start + slot)
-            cues.append((start, end, " ".join(chunk)))
     return "\n\n".join(
-        f"{index}\n{_timestamp(start)} --> {_timestamp(end)}\n{text}"
-        for index, (start, end, text) in enumerate(cues, start=1)
+        f"{index}\n{_timestamp(line.start)} --> {_timestamp(line.end)}\n{line.translation.strip()}"
+        for index, line in enumerate(lines, start=1)
+        if line.translation.strip()
     ) + "\n"
 
 

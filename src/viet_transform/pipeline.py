@@ -83,7 +83,7 @@ def execute(
     script_file = options.work_dir / "script.translated.txt"
     _stage(
         translated_dialogue,
-        "Dich Gemini va bien tap GPT",
+        "Dich va bien tap AI",
         options.resume,
         lambda: _translate_dialogue(
             source_dialogue,
@@ -150,7 +150,9 @@ def _translate_dialogue(
     settings: Settings,
     target_language: str,
 ) -> Path:
-    lines = ai.translate_dialogue(load_dialogue(source), settings, target_language)
+    lines = ai.translate_dialogue(
+        load_dialogue(source), settings, target_language, output.parent / "ai-cache"
+    )
     _write_text(script_file, dialogue_script(lines))
     return save_dialogue(lines, output)
 

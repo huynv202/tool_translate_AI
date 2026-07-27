@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -68,12 +69,15 @@ def write_script(transcript: str, settings: Settings) -> str:
 
 
 def translate_dialogue(
-    lines: list[DialogueLine], settings: Settings, target_language: str = "Vietnamese"
+    lines: list[DialogueLine],
+    settings: Settings,
+    target_language: str = "Vietnamese",
+    cache_dir: Path | None = None,
 ) -> list[DialogueLine]:
     translated: list[dict[str, object]] = []
     for start in range(0, len(lines), 30):
         translated.extend(
-            _translate_batch(lines[start : start + 30], settings, target_language)
+            _translate_batch(lines[start : start + 30], settings, target_language, cache_dir)
         )
     try:
         by_id = {int(item["id"]): str(item["translation"]).strip() for item in translated}
@@ -85,10 +89,12 @@ def translate_dialogue(
         line.translation = by_id[line.id]
         if not line.translation:
             raise PipelineError(f"Ban dich cua cau {line.id} bi rong.")
-    return adapt_dialogue(lines, settings)
+    return adapt_dialogue(lines, settings, cache_dir)
 
 
-def adapt_dialogue(lines: list[DialogueLine], settings: Settings) -> list[DialogueLine]:
+def adapt_dialogue(
+    lines: list[DialogueLine], settings: Settings, cache_dir: Path | None = None
+) -> list[DialogueLine]:
     adapted: list[dict[str, object]] = []
     for start in range(0, len(lines), 30):
         batch = lines[start : start + 30]
@@ -96,65 +102,64 @@ def adapt_dialogue(lines: list[DialogueLine], settings: Settings) -> list[Dialog
             {
                 "id": line.id,
                 "duration_seconds": round(line.duration, 2),
-                "source": line.source,
                 "literal_translation": line.translation,
             }
             for line in batch
         ]
         try:
-            response = _client(settings).chat.completions.create(
-                model=settings.script_model,
-                messages=[
-                    {"role": "system", "content": SCRIPT_PROMPT},
-                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-                ],
-                temperature=0.65,
+            adapted.extend(
+                _cached_json_completion(
+                    settings,
+                    settings.script_model,
+                    SCRIPT_PROMPT,
+                    json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                    0.65,
+                    cache_dir,
+                    "adapt",
+                )
             )
-            adapted.extend(parse_json_response(response.choices[0].message.content or ""))
         except PipelineError:
             raise
         except Exception as exc:
             detail = str(exc)
             if "No active credentials for provider" in detail:
                 raise PipelineError(
-                    "GPT script model khong co credential dang hoat dong trong 9Router. "
-                    "Hay chon cx/... neu auth Codex hoac gh/... neu auth GitHub Copilot."
+                    "Model viet kich ban khong co credential dang hoat dong trong 9Router. "
+                    "Hay chon route GPT hoac Claude thuoc tai khoan da auth."
                 ) from exc
-            raise PipelineError(f"9Router GPT viet kich ban that bai: {detail}") from exc
+            raise PipelineError(f"9Router viet kich ban that bai: {detail}") from exc
     try:
         by_id = {int(item["id"]): str(item["translation"]).strip() for item in adapted}
     except (KeyError, TypeError, ValueError) as exc:
-        raise PipelineError("GPT tra ve cau truc kich ban khong hop le.") from exc
+        raise PipelineError("AI viet kich ban tra ve cau truc khong hop le.") from exc
     if set(by_id) != {line.id for line in lines}:
-        raise PipelineError("GPT tra ve thieu hoac sai id cau thoai.")
+        raise PipelineError("AI viet kich ban tra ve thieu hoac sai id cau thoai.")
     for line in lines:
         line.translation = by_id[line.id]
     return lines
 
 
 def _translate_batch(
-    lines: list[DialogueLine], settings: Settings, target_language: str
+    lines: list[DialogueLine],
+    settings: Settings,
+    target_language: str,
+    cache_dir: Path | None = None,
 ) -> list[dict[str, object]]:
     source = [
         {"id": line.id, "duration_seconds": round(line.duration, 2), "source": line.source}
         for line in lines
     ]
     try:
-        response = _client(settings).chat.completions.create(
-            model=settings.text_model,
-            messages=[
-                {"role": "system", "content": DIALOGUE_PROMPT},
-                {
-                    "role": "user",
-                    "content": (
-                        f"Target language: {target_language}. Translate every segment.\n"
-                        + json.dumps(source, ensure_ascii=False)
-                    ),
-                },
-            ],
-            temperature=0.25,
+        return _cached_json_completion(
+            settings,
+            settings.text_model,
+            DIALOGUE_PROMPT,
+            f"Target language: {target_language}. Translate every segment.\n"
+            + json.dumps(source, ensure_ascii=False, separators=(",", ":")),
+            0.25,
+            cache_dir,
+            "translate",
         )
-        return parse_json_response(response.choices[0].message.content or "")
     except PipelineError:
         raise
     except Exception as exc:
@@ -169,6 +174,52 @@ def _translate_batch(
                 "Model da chon khong co provider dang hoat dong trong 9Router."
             ) from exc
         raise PipelineError(f"9Router dich hoi thoai that bai: {detail}") from exc
+
+
+def _cached_json_completion(
+    settings: Settings,
+    model: str,
+    system_prompt: str,
+    user_content: str,
+    temperature: float,
+    cache_dir: Path | None,
+    prefix: str,
+) -> list[dict[str, object]]:
+    key_data = json.dumps(
+        {
+            "model": model,
+            "system": system_prompt,
+            "user": user_content,
+            "temperature": temperature,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    cache_path: Path | None = None
+    if cache_dir:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha256(key_data.encode("utf-8")).hexdigest()[:24]
+        cache_path = cache_dir / f"{prefix}-{digest}.json"
+        if cache_path.is_file():
+            return parse_json_response(cache_path.read_text(encoding="utf-8"))
+    response = _client(settings).chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=temperature,
+    )
+    content = response.choices[0].message.content or ""
+    parsed = parse_json_response(content)
+    if cache_path:
+        temporary = cache_path.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(parsed, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+        )
+        temporary.replace(cache_path)
+    return parsed
 
 
 def _validate_script(script: str) -> str:

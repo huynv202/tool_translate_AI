@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib.util
 import os
 import time
 import wave
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -60,6 +61,8 @@ class SpeechChunk:
     start: float
     end: float
     text: str
+    voice: str | None = None
+    speaker: int | None = None
 
     @property
     def duration(self) -> float:
@@ -71,7 +74,7 @@ def synthesize_dialogue(
 ) -> Path:
     clips_dir = work_dir / "voice-clips"
     clips_dir.mkdir(parents=True, exist_ok=True)
-    chunks = group_dialogue(lines)
+    chunks = dialogue_chunks(lines)
     wants_xtts = settings.tts_engine == "quality" or settings.tts_voice.startswith("xtts-")
     use_xtts = wants_xtts and xtts_ready()
     use_piper = (
@@ -85,26 +88,34 @@ def synthesize_dialogue(
     )
     clips: list[tuple[Path, SpeechChunk, float]] = []
     for chunk in chunks:
-        engine_name = "xtts" if use_xtts else ("piper" if use_piper else "edge")
-        clip = clips_dir / f"{engine_name}-chunk-{chunk.index:04d}.mp3"
+        chunk_voice = chunk.voice or settings.tts_voice
+        chunk_speaker = chunk.speaker if chunk.speaker is not None else settings.tts_speaker
+        chunk_uses_piper = chunk_voice.startswith("vi-piper-") or (not chunk.voice and use_piper)
+        chunk_uses_xtts = chunk_voice.startswith("xtts-") and use_xtts
+        engine_name = "xtts" if chunk_uses_xtts else ("piper" if chunk_uses_piper else "edge")
+        voice_key = "".join(char if char.isalnum() else "-" for char in chunk_voice)[-48:]
+        content_key = hashlib.sha1(chunk.text.encode("utf-8")).hexdigest()[:10]
+        clip = clips_dir / (
+            f"{engine_name}-{voice_key}-{content_key}-chunk-{chunk.index:04d}.mp3"
+        )
         if not clip.exists() or clip.stat().st_size == 0:
             try:
-                if use_xtts:
+                if chunk_uses_xtts:
                     try:
                         synthesize_xtts(chunk.text, clip, settings.tts_reference)
                     except PipelineError:
                         engine_name = "piper"
-                        clip = clips_dir / f"piper-chunk-{chunk.index:04d}.mp3"
+                        clip = clips_dir / f"piper-fallback-chunk-{chunk.index:04d}.mp3"
                         if not clip.exists() or clip.stat().st_size == 0:
                             synthesize_piper(
                                 chunk.text,
                                 clip,
                                 Path("work/models/piper").resolve(),
                             )
-                elif use_piper:
+                elif chunk_uses_piper:
                     piper_voice = (
-                        settings.tts_voice
-                        if settings.tts_voice.startswith("vi-piper-")
+                        chunk_voice
+                        if chunk_voice.startswith("vi-piper-")
                         else "vi-piper-vais1000-medium"
                     )
                     synthesize_piper(
@@ -112,10 +123,10 @@ def synthesize_dialogue(
                         clip,
                         Path("work/models/piper").resolve(),
                         piper_voice,
-                        settings.tts_speaker,
+                        chunk_speaker,
                     )
                 else:
-                    synthesize(chunk.text, clip, settings)
+                    synthesize(chunk.text, clip, replace(settings, tts_voice=chunk_voice))
             except PipelineError as exc:
                 raise PipelineError(
                     f"TTS block {chunk.index}/{len(chunks)} ({chunk.start:.1f}s-"
@@ -126,35 +137,96 @@ def synthesize_dialogue(
         clip_duration = duration(clip)
         clips.append((clip, chunk, clip_duration))
 
+    total_duration = max(line.end for line in lines) + 0.5
+    _assemble_timeline(clips, output, work_dir, total_duration)
+    return output
+
+
+def dialogue_chunks(lines: list[DialogueLine]) -> list[SpeechChunk]:
+    return [
+        SpeechChunk(
+            index=index,
+            start=line.start,
+            end=line.end,
+            text=line.translation.strip(),
+            voice=line.voice,
+            speaker=line.speaker,
+        )
+        for index, line in enumerate(lines, start=1)
+        if line.translation.strip()
+    ]
+
+
+def _assemble_timeline(
+    clips: list[tuple[Path, SpeechChunk, float]],
+    output: Path,
+    work_dir: Path,
+    total_duration: float,
+    batch_size: int = 48,
+) -> None:
+    batches_dir = work_dir / "voice-batches"
+    batches_dir.mkdir(parents=True, exist_ok=True)
+    batch_outputs: list[Path] = []
+    cursor = 0.0
+    for batch_index, start in enumerate(range(0, len(clips), batch_size), start=1):
+        batch = clips[start : start + batch_size]
+        signature = f"cursor={cursor:.3f}|" + "|".join(
+            f"{clip.name}:{chunk.start:.3f}:{chunk.end:.3f}:{clip_duration:.3f}"
+            for clip, chunk, clip_duration in batch
+        )
+        digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:12]
+        batch_output = batches_dir / f"batch-{batch_index:04d}-{digest}.mp3"
+        batch_end = max(chunk.end for _, chunk, _ in batch)
+        if not batch_output.is_file() or batch_output.stat().st_size == 0:
+            _render_timeline_batch(batch, batch_output, work_dir, batch_index, cursor)
+        batch_outputs.append(batch_output)
+        cursor = max(cursor, batch_end)
+
+    command = ["ffmpeg", "-y"]
+    for batch_output in batch_outputs:
+        command += ["-i", str(batch_output)]
+    labels = "".join(f"[{index}:a]" for index in range(len(batch_outputs)))
+    command += [
+        "-filter_complex",
+        f"{labels}concat=n={len(batch_outputs)}:v=0:a=1,apad=pad_dur=0.5[dialogue]",
+        "-map", "[dialogue]", "-t", f"{total_duration:.3f}", "-c:a", "libmp3lame",
+        "-b:a", "192k", str(output),
+    ]
+    run(command)
+
+
+def _render_timeline_batch(
+    batch: list[tuple[Path, SpeechChunk, float]],
+    output: Path,
+    work_dir: Path,
+    batch_index: int,
+    initial_cursor: float,
+) -> None:
     command = ["ffmpeg", "-y"]
     filters: list[str] = []
     labels: list[str] = []
-    for index, (clip, chunk, clip_duration) in enumerate(clips):
+    cursor = initial_cursor
+    for index, (clip, chunk, clip_duration) in enumerate(batch):
         command += ["-i", str(clip)]
         tempo = max(1.0, clip_duration / chunk.duration)
-        delay = max(0, round(chunk.start * 1000))
-        label = f"d{index}"
-        filters.append(f"[{index}:a]{_atempo(tempo)},adelay={delay}|{delay}[{label}]")
+        delay = max(0, round((chunk.start - cursor) * 1000))
+        span = max(0.4, chunk.end - cursor)
+        label = f"s{index}"
+        filters.append(
+            f"[{index}:a]asetpts=PTS-STARTPTS,{_atempo(tempo)},adelay={delay}|{delay},"
+            f"aresample=async=1:first_pts=0,apad,atrim=duration={span:.3f},"
+            f"asetpts=PTS-STARTPTS[{label}]"
+        )
         labels.append(f"[{label}]")
-    total_duration = max(line.end for line in lines) + 0.5
-    filters.append(
-        f"{''.join(labels)}amix=inputs={len(labels)}:duration=longest:normalize=0[dialogue]"
-    )
+        cursor = max(cursor, chunk.end)
+    filters.append(f"{''.join(labels)}concat=n={len(labels)}:v=0:a=1[dialogue]")
+    filter_script = work_dir / f"voice-filter-{batch_index:04d}.txt"
+    filter_script.write_text(";".join(filters), encoding="utf-8")
     command += [
-        "-filter_complex",
-        ";".join(filters),
-        "-map",
-        "[dialogue]",
-        "-t",
-        str(total_duration),
-        "-c:a",
-        "libmp3lame",
-        "-b:a",
-        "192k",
-        str(output),
+        "-filter_complex_script", str(filter_script), "-map", "[dialogue]",
+        "-c:a", "libmp3lame", "-b:a", "192k", str(output),
     ]
     run(command)
-    return output
 
 
 def xtts_ready() -> bool:
@@ -226,6 +298,8 @@ def group_dialogue(
                 start=current[0].start,
                 end=current[-1].end,
                 text=" ".join(line.translation.strip() for line in current),
+                voice=current[0].voice,
+                speaker=current[0].speaker,
             )
         )
         current.clear()
@@ -234,7 +308,12 @@ def group_dialogue(
         proposed_chars = sum(len(item.translation) + 1 for item in current) + len(line.translation)
         proposed_span = line.end - current[0].start if current else line.duration
         gap = line.start - current[-1].end if current else 0
-        if current and (proposed_span > max_span or proposed_chars > max_chars or gap > 2.5):
+        voice_changed = current and (
+            line.voice != current[0].voice or line.speaker != current[0].speaker
+        )
+        if current and (
+            proposed_span > max_span or proposed_chars > max_chars or gap > 2.5 or voice_changed
+        ):
             flush()
         current.append(line)
     flush()

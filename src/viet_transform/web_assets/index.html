@@ -106,7 +106,7 @@
         </div>
         <div class="voice-preview"><button type="button" id="previewVoice">▶ NGHE THỬ GIỌNG</button><audio id="voiceAudio" controls hidden></audio><span id="voiceHint">Piper chạy local, phù hợp video dài và không bị giới hạn dịch vụ.</span></div>
         <label class="voice-reference"><input type="file" name="voice_reference" accept="audio/wav,audio/mpeg,audio/mp4"><span>＋ MẪU GIỌNG XTTS 10–30 GIÂY</span><small id="voiceReferenceName">Không bắt buộc · âm thanh sạch, một người nói</small></label>
-        <div class="quality-note"><span>GEMINI → GPT</span><p>Gemini dịch chính xác từng cue; GPT viết lại lời thoại tự nhiên, thêm chất hài nhẹ nhưng giữ nguyên ID và timestamp.</p></div>
+        <div class="quality-note"><span>GEMINI → AI SCRIPT</span><p>Gemini dịch chính xác từng cue; GPT hoặc Claude viết lại lời thoại tự nhiên, thêm chất hài nhẹ nhưng giữ nguyên ID và timestamp.</p></div>
       </section>
 
       <section class="launch-panel">
@@ -137,10 +137,12 @@
         </div>
         <aside class="editor-inspector">
           <div class="editor-pane active" data-editor-pane="content">
-            <div class="editor-head"><span>BẢN DỊCH THEO CUE</span><small id="wordCount">0 từ</small></div>
-            <textarea id="scriptEditor" aria-label="Bản dịch subtitle"></textarea>
-            <p class="editor-note">Mỗi dòng là một cue. Giữ nguyên số dòng để bảo toàn timeline.</p>
-            <button type="button" class="regenerate-button" id="regenerateButton">TẠO LẠI VOICE & SUB <span>↻</span></button>
+            <div class="editor-head"><span>CLIP / CUE EDITOR</span><small id="wordCount">0 từ</small></div>
+            <div class="cue-actions"><button type="button" id="addCueButton">+ THÊM</button><button type="button" id="splitCueButton">TÁCH</button><button type="button" id="deleteCueButton">XÓA</button></div>
+            <div class="cue-editor-list" id="cueEditorList"></div>
+            <textarea id="scriptEditor" aria-label="Bản dịch subtitle" hidden></textarea>
+            <p class="editor-note">Chỉnh nội dung, mốc thời gian và giọng riêng từng đoạn. Timeline không cho phép các cue chồng nhau.</p>
+            <button type="button" class="regenerate-button" id="regenerateButton">ÁP DỤNG TIMELINE & RENDER <span>↻</span></button>
           </div>
           <div class="editor-pane" data-editor-pane="subtitles">
             <h3>STYLE PHỤ ĐỀ</h3>
@@ -186,18 +188,18 @@
       <label class="field wide"><span>BASE URL</span><input type="url" id="routerUrl" required value="http://localhost:20128/v1"></label>
       <div class="dialog-grid">
         <label class="field"><span>GEMINI · DỊCH SUB</span><select id="textModel" required><option value="">Tải model từ 9Router</option></select></label>
-        <label class="field"><span>GPT · VIẾT KỊCH BẢN</span><select id="scriptModel" required><option value="">Tải model từ 9Router</option></select></label>
+        <label class="field"><span>GPT / CLAUDE · VIẾT KỊCH BẢN</span><select id="scriptModel" required><option value="">Tải model từ 9Router</option></select></label>
         <label class="field"><span>LOCAL WHISPER</span><select id="whisperModel"><option value="base">Base · nhanh</option><option value="small" selected>Small · cân bằng</option><option value="medium">Medium · chất lượng cao</option></select></label>
       </div>
       <div class="router-status" id="routerStatus" role="status" aria-live="polite"><i></i><span>Sẵn sàng kiểm tra kết nối 9Router.</span></div>
       <div class="dialog-actions">
         <button class="probe-button" type="button" id="probeRouter">TẢI DANH SÁCH MODEL</button>
-        <button class="probe-button accent" type="button" id="testRouterModel">TEST GEMINI & GPT</button>
+        <button class="probe-button accent" type="button" id="testRouterModel">TEST 2 MODEL</button>
         <button class="save-button" value="default">LƯU CẤU HÌNH</button>
       </div>
     </form>
   </dialog>
   <div class="toast" id="toast"></div>
-  <script src="/assets/app.js?v=20260727-2"></script>
+  <script src="/assets/app.js?v=20260727-4"></script>
 </body>
 </html>

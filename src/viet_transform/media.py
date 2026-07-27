@@ -23,7 +23,10 @@ def run(command: list[str]) -> None:
     result = subprocess.run(command, text=True, capture_output=True, check=False)
     if result.returncode:
         lines = result.stderr.strip().splitlines()
-        detail = " | ".join(lines[-8:]) if lines else "unknown error"
+        error_markers = ("error", "failed", "invalid", "no space", "cannot", "unable")
+        relevant = [line for line in lines if any(marker in line.lower() for marker in error_markers)]
+        detail_lines = relevant[-8:] or lines[-16:]
+        detail = " | ".join(detail_lines) if detail_lines else "unknown error"
         raise PipelineError(f"Lenh media that bai: {detail}")
 
 
@@ -41,7 +44,12 @@ def duration(path: Path) -> float:
 
 def extract_audio(video: Path, output: Path) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
-    run(["ffmpeg", "-y", "-i", str(video), "-vn", "-ac", "1", "-ar", "16000", str(output)])
+    media_duration = duration(video)
+    run([
+        "ffmpeg", "-y", "-i", str(video), "-vn", "-af",
+        "aresample=async=1:first_pts=0", "-ac", "1", "-ar", "16000",
+        "-t", f"{media_duration:.3f}", str(output),
+    ])
     return output
 
 
