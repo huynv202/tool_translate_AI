@@ -1,5 +1,8 @@
 # Viet Transform Studio
 
+Huong dan Windows day du: xem [WINDOWS.md](WINDOWS.md). Tren Windows co the chay
+`setup-windows.ps1` de cai dat va double-click `run-windows.bat` de mo giao dien.
+
 Web studio bien video **ma ban co quyen su dung** thanh video review tieng Viet: lay nguon, nhan
 dang loi thoai Trung, viet lai kich ban, tao voice-over, phu de va render bang FFmpeg.
 Thay doi hinh/nhac khong tu dong tao ra quyen su dung; hay dam bao giay phep nguon, nhac va tuan thu
