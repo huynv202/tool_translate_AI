@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Studio bien tap video review tieng Viet bang AI">
+  <title>Viet Transform Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260727-2">
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Viet Transform Studio">
+      <span class="brand-mark">VT</span>
+      <span>TRANSFORM<br>STUDIO</span>
+    </a>
+    <div class="system-state"><i></i> ENGINE ONLINE</div>
+    <button class="ghost-button" type="button" id="openSettings">9ROUTER CONFIG</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">AI VIDEO WORKBENCH / 01</p>
+        <h1>BIẾN THƯỚC PHIM<br><span>THÀNH CÂU CHUYỆN.</span></h1>
+        <p class="lead">Một bàn dựng tự động cho video review tiếng Việt — từ nhận diện lời thoại, viết kịch bản, voice-over đến phụ đề và bản xuất 9:16.</p>
+      </div>
+      <div class="hero-stamp"><strong>7</strong><span>STAGE<br>PIPELINE</span></div>
+    </section>
+
+    <form id="studioForm" class="studio-grid">
+      <section class="panel source-panel">
+        <div class="panel-heading">
+          <span class="step-number">01</span>
+          <div><p>NGUỒN TƯ LIỆU</p><h2>Đưa video vào studio</h2></div>
+        </div>
+
+        <div class="source-tabs" role="tablist">
+          <button type="button" class="tab active" data-tab="upload">UPLOAD FILE</button>
+          <button type="button" class="tab" data-tab="url">DÁN URL</button>
+        </div>
+        <div class="tab-pane active" id="uploadPane">
+          <label class="dropzone" id="dropzone">
+            <input type="file" name="video_file" id="videoFile" accept="video/*" multiple>
+            <span class="upload-icon">↗</span>
+            <strong id="fileTitle">KÉO TỐI ĐA 10 VIDEO VÀO ĐÂY</strong>
+            <small id="fileMeta">MP4, MOV, WEBM · tối đa 10 video mỗi hàng đợi</small>
+            <span class="browse">CHỌN 1 HOẶC NHIỀU VIDEO TỪ MÁY</span>
+          </label>
+        </div>
+        <div class="tab-pane" id="urlPane">
+          <label class="field wide"><span>URL VIDEO</span><input name="source_url" id="sourceUrl" type="url" placeholder="https://..."></label>
+          <p class="field-note">Hỗ trợ các nguồn công khai mà yt-dlp có thể truy cập.</p>
+        </div>
+
+        <div class="mini-preview" id="miniPreview" hidden>
+          <video id="sourcePreview" muted playsinline></video>
+          <div><strong id="previewName">video.mp4</strong><span>Sẵn sàng xử lý</span></div>
+          <button type="button" id="removeVideo" aria-label="Xóa video">×</button>
+        </div>
+        <div class="batch-box" id="batchBox">
+          <div><strong>RENDER HÀNG LOẠT · TỐI ĐA 10 VIDEO</strong><button type="button" id="chooseDraftFolder">CHỌN THƯ MỤC BẢN NHÁP</button></div>
+          <small id="draftFolderStatus">Chọn nhiều file trong cửa sổ bằng Ctrl/Shift. Studio xử lý lần lượt và retry mỗi video 5 lần.</small>
+          <div id="batchList" class="batch-list"><div class="batch-empty">Chưa có video trong hàng đợi</div></div>
+        </div>
+      </section>
+
+      <section class="panel controls-panel">
+        <div class="panel-heading">
+          <span class="step-number">02</span>
+          <div><p>CHỈ ĐẠO HÌNH ẢNH</p><h2>Thiết lập bản dựng</h2></div>
+        </div>
+        <div class="control-grid">
+          <label class="field"><span>ĐỘ PHÂN GIẢI</span><select name="resolution"><option value="1080x1920">Shorts · 1080 × 1920</option><option value="720x1280">Preview · 720 × 1280</option><option value="1920x1080">Long-form · 1920 × 1080</option></select></label>
+          <label class="field"><span>FONT PHỤ ĐỀ</span><select name="font_name"><option>Montserrat</option><option>Impact</option><option>DejaVu Sans</option></select></label>
+          <label class="field"><span>LÀM MỜ WATERMARK</span><select name="watermark_position"><option value="top-left" selected>Góc trên trái</option><option value="top-right">Góc trên phải</option><option value="bottom-left">Góc dưới trái</option><option value="bottom-right">Góc dưới phải</option><option value="none">Không xử lý</option></select></label>
+          <label class="field"><span>VỊ TRÍ LOGO</span><select name="logo_position"><option value="top-right" selected>Góc trên phải</option><option value="top-left">Góc trên trái</option><option value="bottom-right">Góc dưới phải</option><option value="bottom-left">Góc dưới trái</option></select></label>
+          <label class="range-field"><span><b>ZOOM / CROP</b><output id="zoomOut">6%</output></span><input type="range" name="zoom" min="1" max="1.2" step="0.01" value="1.06" data-output="zoomOut" data-format="percentZoom"></label>
+          <label class="range-field"><span><b>CẮT ĐẦU & CUỐI</b><output id="trimOut">0.5s</output></span><input type="range" name="trim_seconds" min="0" max="3" step="0.1" value="0.5" data-output="trimOut" data-format="seconds"></label>
+          <label class="range-field"><span><b>NHẠC NỀN</b><output id="musicOut">12%</output></span><input type="range" name="music_volume" min="0" max="0.5" step="0.01" value="0.12" data-output="musicOut" data-format="percent"></label>
+          <label class="range-field"><span><b>KÍCH THƯỚC LOGO</b><output id="logoWidthOut">16%</output></span><input type="range" name="logo_width" min="0.05" max="0.4" step="0.01" value="0.16" data-output="logoWidthOut" data-format="percent"></label>
+          <label class="range-field"><span><b>ĐỘ RÕ LOGO</b><output id="logoOpacityOut">90%</output></span><input type="range" name="logo_opacity" min="0.1" max="1" step="0.05" value="0.9" data-output="logoOpacityOut" data-format="percent"></label>
+          <label class="switch-row"><span><b>LẬT NGANG</b><small>Phù hợp khi bố cục cho phép</small></span><input type="checkbox" name="flip" checked><i></i></label>
+          <label class="switch-row"><span><b>CHE SUBTITLE GỐC</b><small>Tạo caption band ổn định ở vùng dưới</small></span><input type="checkbox" name="cover_source_subtitles" checked><i></i></label>
+        </div>
+        <div class="asset-uploads">
+          <label class="music-upload"><input type="file" name="music_file" accept="audio/*"><span>＋ NHẠC NỀN RIÊNG</span><small id="musicName">Không bắt buộc</small></label>
+          <label class="music-upload"><input type="file" name="logo_file" accept="image/png,image/webp,image/jpeg"><span>＋ LOGO THƯƠNG HIỆU</span><small id="logoName">PNG nền trong suốt</small></label>
+        </div>
+      </section>
+
+      <section class="panel voice-panel">
+        <div class="panel-heading">
+          <span class="step-number">03</span>
+          <div><p>DỊCH & LỒNG TIẾNG</p><h2>Ngôn ngữ đầu ra</h2></div>
+        </div>
+        <div class="voice-card">
+          <div class="avatar">HM</div>
+          <label class="field"><span>NGÔN NGỮ SUB</span><select name="target_language" id="targetLanguage"><option value="Vietnamese" selected>Tiếng Việt</option><option value="English">English</option><option value="Thai">ภาษาไทย</option><option value="Indonesian">Bahasa Indonesia</option><option value="Japanese">日本語</option><option value="Korean">한국어</option><option value="Spanish">Español</option></select></label>
+          <label class="field"><span>VOICE</span><select name="tts_voice" id="ttsVoice"><option value="xtts-auto" data-lang="Vietnamese" data-engine="quality" selected>XTTS v2 · Tự động tốt nhất</option><option value="vi-piper-vais1000-medium" data-lang="Vietnamese" data-engine="piper">Vân Anh · Nữ · video dài</option><option value="vi-piper-25hours-low" data-lang="Vietnamese" data-engine="piper">Minh Châu · Nữ nhẹ</option><option value="vi-piper-vivos-x-low" data-lang="Vietnamese" data-engine="piper" data-speaker="12">Hải Nam · Nam ấm</option><option value="vi-VN-HoaiMyNeural" data-lang="Vietnamese" data-engine="edge">Hoài My · Nữ online</option><option value="vi-VN-NamMinhNeural" data-lang="Vietnamese" data-engine="edge">Nam Minh · Nam online</option><option value="en-US-JennyNeural" data-lang="English" data-engine="edge">Jenny · Female</option><option value="en-US-GuyNeural" data-lang="English" data-engine="edge">Guy · Male</option><option value="th-TH-PremwadeeNeural" data-lang="Thai" data-engine="edge">Premwadee · Female</option><option value="id-ID-GadisNeural" data-lang="Indonesian" data-engine="edge">Gadis · Female</option><option value="ja-JP-NanamiNeural" data-lang="Japanese" data-engine="edge">Nanami · Female</option><option value="ko-KR-SunHiNeural" data-lang="Korean" data-engine="edge">SunHi · Female</option><option value="es-ES-ElviraNeural" data-lang="Spanish" data-engine="edge">Elvira · Female</option></select></label>
+          <label class="field"><span>TTS ENGINE</span><select name="tts_engine" id="ttsEngine"><option value="quality" selected>Tự động · XTTS → Piper</option><option value="piper">Piper local · ổn định</option><option value="edge">Edge · video ngắn</option></select></label>
+          <label class="field compact"><span>TỐC ĐỘ</span><select name="tts_rate"><option value="-5%">0.95×</option><option value="+0%" selected>1.00×</option><option value="+3%">1.03×</option><option value="+5%">1.05×</option></select></label>
+        </div>
+        <div class="voice-preview"><button type="button" id="previewVoice">▶ NGHE THỬ GIỌNG</button><audio id="voiceAudio" controls hidden></audio><span id="voiceHint">Piper chạy local, phù hợp video dài và không bị giới hạn dịch vụ.</span></div>
+        <label class="voice-reference"><input type="file" name="voice_reference" accept="audio/wav,audio/mpeg,audio/mp4"><span>＋ MẪU GIỌNG XTTS 10–30 GIÂY</span><small id="voiceReferenceName">Không bắt buộc · âm thanh sạch, một người nói</small></label>
+        <div class="quality-note"><span>GEMINI → GPT</span><p>Gemini dịch chính xác từng cue; GPT viết lại lời thoại tự nhiên, thêm chất hài nhẹ nhưng giữ nguyên ID và timestamp.</p></div>
+      </section>
+
+      <section class="launch-panel">
+        <div><span class="ready-dot"></span><strong>STUDIO READY</strong><small>API key chỉ được giữ trong bộ nhớ của tác vụ</small></div>
+        <button type="submit" class="launch-button" id="launchButton"><span>BẮT ĐẦU SẢN XUẤT</span><b>→</b></button>
+      </section>
+    </form>
+
+    <section class="production" id="production" hidden>
+      <div class="production-head">
+        <div><p class="eyebrow">LIVE PRODUCTION / <span id="jobId">—</span></p><h2>Đang dựng câu chuyện của bạn</h2></div>
+        <strong id="progressNumber">0%</strong>
+      </div>
+      <div class="progress-track"><i id="progressBar"></i></div>
+      <div class="stage-list" id="stageList"></div>
+      <div class="error-box" id="errorBox" hidden><span id="errorMessage"></span><button type="button" id="retryJobButton">THỬ LẠI TỪ BLOCK ĐÃ DỪNG</button></div>
+      <div class="result-grid" id="resultGrid" hidden>
+        <div class="editor-toolbar">
+          <button class="editor-tab active" data-editor-tab="content" title="Nội dung"><b>✎</b><span>Nội dung</span></button>
+          <button class="editor-tab" data-editor-tab="subtitles" title="Phụ đề"><b>CC</b><span>Phụ đề</span></button>
+          <button class="editor-tab" data-editor-tab="brand" title="Thương hiệu"><b>◆</b><span>Brand</span></button>
+          <button class="editor-tab" data-editor-tab="audio" title="Âm thanh"><b>♫</b><span>Audio</span></button>
+          <button class="editor-tab" data-editor-tab="export" title="Xuất"><b>↗</b><span>Xuất</span></button>
+        </div>
+        <div class="editor-canvas">
+          <div class="canvas-top"><span>PREVIEW · 9:16</span><span id="editorTime">00:00 / 00:00</span></div>
+          <div class="video-shell"><video id="resultVideo" controls playsinline></video></div>
+        </div>
+        <aside class="editor-inspector">
+          <div class="editor-pane active" data-editor-pane="content">
+            <div class="editor-head"><span>BẢN DỊCH THEO CUE</span><small id="wordCount">0 từ</small></div>
+            <textarea id="scriptEditor" aria-label="Bản dịch subtitle"></textarea>
+            <p class="editor-note">Mỗi dòng là một cue. Giữ nguyên số dòng để bảo toàn timeline.</p>
+            <button type="button" class="regenerate-button" id="regenerateButton">TẠO LẠI VOICE & SUB <span>↻</span></button>
+          </div>
+          <div class="editor-pane" data-editor-pane="subtitles">
+            <h3>STYLE PHỤ ĐỀ</h3>
+            <label class="field"><span>FONT</span><select id="editFont"><option>Montserrat</option><option>Impact</option><option>DejaVu Sans</option></select></label>
+            <label class="field"><span>MÀU CHỮ</span><select id="editSubtitleColor"><option value="white">Trắng</option><option value="yellow">Vàng</option><option value="cyan">Cyan</option></select></label>
+            <label class="range-field"><span><b>CỠ CHỮ</b><output id="editSizeOut">11</output></span><input id="editSubtitleSize" type="range" min="7" max="30" value="11"></label>
+            <label class="range-field"><span><b>VỊ TRÍ DƯỚI</b><output id="editMarginOut">110</output></span><input id="editSubtitleMargin" type="range" min="20" max="400" value="110"></label>
+            <label class="range-field"><span><b>NỀN CAPTION</b><output id="editCaptionOut">48%</output></span><input id="editCaptionOpacity" type="range" min="0" max="0.9" step="0.05" value="0.48"></label>
+          </div>
+          <div class="editor-pane" data-editor-pane="brand">
+            <h3>THƯƠNG HIỆU</h3>
+            <label class="field"><span>VỊ TRÍ LOGO</span><select id="editLogoPosition"><option value="top-right">Trên phải</option><option value="top-left">Trên trái</option><option value="bottom-right">Dưới phải</option><option value="bottom-left">Dưới trái</option></select></label>
+            <label class="range-field"><span><b>KÍCH THƯỚC</b><output id="editLogoWidthOut">16%</output></span><input id="editLogoWidth" type="range" min="0.05" max="0.4" step="0.01" value="0.16"></label>
+            <label class="range-field"><span><b>ĐỘ RÕ</b><output id="editLogoOpacityOut">90%</output></span><input id="editLogoOpacity" type="range" min="0.1" max="1" step="0.05" value="0.9"></label>
+          </div>
+          <div class="editor-pane" data-editor-pane="audio">
+            <h3>ÂM THANH</h3>
+            <label class="range-field"><span><b>NHẠC NỀN</b><output id="editMusicOut">12%</output></span><input id="editMusicVolume" type="range" min="0" max="0.5" step="0.01" value="0.12"></label>
+            <p class="editor-note">Voice được chuẩn hóa -16 LUFS và tự động ducking nhạc.</p>
+          </div>
+          <div class="editor-pane" data-editor-pane="export">
+            <h3>MASTER EXPORT</h3>
+            <p>Render MP4 H.264, AAC và tối ưu phát nhanh trên web.</p>
+            <button type="button" id="downloadButton" class="download-button">LƯU VIDEO VỀ MÁY <span>↓</span></button>
+          </div>
+          <button type="button" class="apply-editor-button" id="applyEditorButton">ÁP DỤNG & RENDER LẠI</button>
+        </aside>
+        <div class="editor-timeline">
+          <div class="timeline-ruler"><span>00:00</span><span>25%</span><span>50%</span><span>75%</span><span>END</span></div>
+          <div class="timeline-track video-track"><b>V1</b><div class="track-clip">VIDEO MASTER</div></div>
+          <div class="timeline-track subtitle-track"><b>CC</b><div class="cue-lane" id="cueTimeline"></div></div>
+          <div class="timeline-track audio-track"><b>A1</b><div class="track-clip audio-clip">VOICE + MUSIC</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="dialog-card" id="routerForm">
+      <div class="dialog-head"><div><p>PRIVATE CONNECTION</p><h2>Kết nối 9Router</h2></div><button value="cancel" aria-label="Đóng">×</button></div>
+      <p class="dialog-note">Thông tin được lưu cục bộ trong trình duyệt. API key được gửi cho backend khi tạo job và không ghi vào file.</p>
+      <label class="field wide"><span>9ROUTER API KEY</span><input type="password" id="routerKey" required placeholder="Nhập key của bạn" autocomplete="off"></label>
+      <label class="field wide"><span>BASE URL</span><input type="url" id="routerUrl" required value="http://localhost:20128/v1"></label>
+      <div class="dialog-grid">
+        <label class="field"><span>GEMINI · DỊCH SUB</span><select id="textModel" required><option value="">Tải model từ 9Router</option></select></label>
+        <label class="field"><span>GPT · VIẾT KỊCH BẢN</span><select id="scriptModel" required><option value="">Tải model từ 9Router</option></select></label>
+        <label class="field"><span>LOCAL WHISPER</span><select id="whisperModel"><option value="base">Base · nhanh</option><option value="small" selected>Small · cân bằng</option><option value="medium">Medium · chất lượng cao</option></select></label>
+      </div>
+      <div class="router-status" id="routerStatus" role="status" aria-live="polite"><i></i><span>Sẵn sàng kiểm tra kết nối 9Router.</span></div>
+      <div class="dialog-actions">
+        <button class="probe-button" type="button" id="probeRouter">TẢI DANH SÁCH MODEL</button>
+        <button class="probe-button accent" type="button" id="testRouterModel">TEST GEMINI & GPT</button>
+        <button class="save-button" value="default">LƯU CẤU HÌNH</button>
+      </div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast"></div>
+  <script src="/assets/app.js?v=20260727-2"></script>
+</body>
+</html>

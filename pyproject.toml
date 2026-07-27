@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "viet-transform-studio"
+version = "0.1.0"
+description = "Pipeline tao video review tieng Viet tu nguon video duoc cap phep"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "edge-tts>=7.0.0",
+  "fastapi>=0.115.0",
+  "faster-whisper>=1.1.1",
+  "openai>=1.70.0",
+  "piper-tts>=1.6.0",
+  "python-dotenv>=1.0.1",
+  "python-multipart>=0.0.20",
+  "requests>=2.32.0",
+  "uvicorn[standard]>=0.34.0",
+  "yt-dlp>=2025.1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "ruff>=0.11.0"]
+xtts = ["coqui-tts>=0.27.0"]
+
+[project.scripts]
+viet-transform = "viet_transform.cli:main"
+viet-transform-web = "viet_transform.web:main"
+
+[tool.setuptools.package-data]
+viet_transform = ["web_assets/*"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
