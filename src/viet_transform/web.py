@@ -54,6 +54,19 @@ class Job:
     options: PipelineOptions | None = None
     settings: Settings | None = None
     revision: int = 0
+    logs: list[dict[str, str]] = field(default_factory=list)
+
+    def add_log(self, message: str, level: str = "info", stage: str | None = None) -> None:
+        self.logs.append(
+            {
+                "time": datetime.now(UTC).isoformat(),
+                "level": level,
+                "stage": stage or self.active_stage,
+                "message": message,
+            }
+        )
+        if len(self.logs) > 1000:
+            del self.logs[:-1000]
 
     def public(self) -> dict[str, object]:
         progress = sum(value == "completed" for value in self.stages.values())
@@ -78,6 +91,7 @@ class Job:
             "error": self.error,
             "created_at": self.created_at,
             "artifacts": artifacts,
+            "logs": self.logs,
             "video_url": (
                 f"/api/jobs/{self.id}/video?v={self.revision}"
                 if self.status == "completed" and self.output and self.output.exists()
@@ -142,6 +156,12 @@ class EditorSettings(BaseModel):
     logo_position: str = "top-right"
     logo_width: float = 0.16
     logo_opacity: float = 0.9
+    brightness: float = 0.0
+    contrast: float = 1.0
+    saturation: float = 1.0
+    voice_volume: float = 1.0
+    audio_fade_in: float = 0.0
+    audio_fade_out: float = 0.0
 
 
 class TimelineCue(BaseModel):
@@ -422,6 +442,9 @@ def update_timeline(
     for stage in ("Tao giong doc", "Tao phu de", "Render video"):
         job.stages[stage] = "pending"
     job.error = None
+    job.add_log(f"Da cap nhat timeline {len(lines)} cue; xep hang render lai.")
+    job.add_log("Nguoi dung yeu cau retry pipeline.", "warning")
+    job.add_log("Da cap nhat kich ban; xep hang tao lai voice, subtitle va video.")
     background.add_task(_run_job, job, job.options, job.settings)
     return {"job_id": job.id}
 
@@ -439,6 +462,12 @@ def update_render_settings(
         raise HTTPException(status_code=422, detail="Thong so subtitle khong hop le")
     if not 0 <= editor.music_volume <= 0.5 or not 0 <= editor.caption_opacity <= 0.9:
         raise HTTPException(status_code=422, detail="Thong so am thanh/caption khong hop le")
+    if not -1 <= editor.brightness <= 1 or not 0.5 <= editor.contrast <= 2:
+        raise HTTPException(status_code=422, detail="Thong so anh khong hop le")
+    if not 0 <= editor.saturation <= 3 or not 0 <= editor.voice_volume <= 2:
+        raise HTTPException(status_code=422, detail="Thong so mau/voice khong hop le")
+    if not 0 <= editor.audio_fade_in <= 5 or not 0 <= editor.audio_fade_out <= 5:
+        raise HTTPException(status_code=422, detail="Thong so fade audio khong hop le")
     render_options = replace(
         job.options.render,
         subtitle_font_size=editor.subtitle_font_size,
@@ -450,12 +479,19 @@ def update_render_settings(
         logo_position=editor.logo_position,
         logo_width=editor.logo_width,
         logo_opacity=editor.logo_opacity,
+        brightness=editor.brightness,
+        contrast=editor.contrast,
+        saturation=editor.saturation,
+        voice_volume=editor.voice_volume,
+        audio_fade_in=editor.audio_fade_in,
+        audio_fade_out=editor.audio_fade_out,
     )
     job.options = replace(job.options, render=render_options)
     job.settings = replace(job.settings, font_name=editor.font_name)
     if job.output and job.output.exists():
         job.output.unlink()
     job.stages["Render video"] = "pending"
+    job.add_log("Da cap nhat hinh anh/am thanh; xep hang render video.")
     background.add_task(_run_job, job, job.options, job.settings)
     return {"job_id": job.id}
 
@@ -598,6 +634,7 @@ async def create_job(
     )
     job.options = options
     job.settings = settings
+    job.add_log("Job da duoc tao va dang cho xu ly.")
     background.add_task(_run_job, job, options, settings)
     return {"job_id": job.id}
 
@@ -606,18 +643,28 @@ def _run_job(job: Job, options: PipelineOptions, settings: Settings) -> None:
     def progress(stage: str, status: str) -> None:
         job.active_stage = stage
         job.stages[stage] = status
+        labels = {"running": "Bat dau", "completed": "Hoan thanh", "failed": "That bai"}
+        job.add_log(f"{labels.get(status, status)}: {stage}", stage=stage)
 
     job.status = "running"
     job.error = None
+    job.add_log("Pipeline bat dau chay.")
     try:
-        job.output = execute(options, settings, progress)
+        job.output = execute(
+            options,
+            settings,
+            progress,
+            lambda message: job.add_log(message, stage=job.active_stage),
+        )
         job.status = "completed"
         job.active_stage = "Hoan tat"
         job.revision += 1
+        job.add_log("Video da render hoan tat.", stage="Hoan tat")
     except Exception as exc:
         LOG.exception("Job %s failed", job.id)
         job.status = "failed"
         job.error = str(exc)
+        job.add_log(str(exc), "error")
         if job.active_stage in job.stages:
             job.stages[job.active_stage] = "failed"
 

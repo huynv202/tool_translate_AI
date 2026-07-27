@@ -118,15 +118,17 @@
     <section class="production" id="production" hidden>
       <div class="production-head">
         <div><p class="eyebrow">LIVE PRODUCTION / <span id="jobId">—</span></p><h2>Đang dựng câu chuyện của bạn</h2></div>
-        <strong id="progressNumber">0%</strong>
+        <div class="production-actions"><button type="button" id="toggleLogButton">XEM LOG</button><strong id="progressNumber">0%</strong></div>
       </div>
       <div class="progress-track"><i id="progressBar"></i></div>
       <div class="stage-list" id="stageList"></div>
+      <section class="job-log-panel" id="jobLogPanel" hidden><div class="job-log-head"><strong>NHẬT KÝ XỬ LÝ</strong><button type="button" id="closeLogButton">×</button></div><div class="job-log-list" id="jobLogList"><p>Chưa có log.</p></div></section>
       <div class="error-box" id="errorBox" hidden><span id="errorMessage"></span><button type="button" id="retryJobButton">THỬ LẠI TỪ BLOCK ĐÃ DỪNG</button></div>
       <div class="result-grid" id="resultGrid" hidden>
         <div class="editor-toolbar">
           <button class="editor-tab active" data-editor-tab="content" title="Nội dung"><b>✎</b><span>Nội dung</span></button>
           <button class="editor-tab" data-editor-tab="subtitles" title="Phụ đề"><b>CC</b><span>Phụ đề</span></button>
+          <button class="editor-tab" data-editor-tab="image" title="Hình ảnh"><b>◐</b><span>Hình ảnh</span></button>
           <button class="editor-tab" data-editor-tab="brand" title="Thương hiệu"><b>◆</b><span>Brand</span></button>
           <button class="editor-tab" data-editor-tab="audio" title="Âm thanh"><b>♫</b><span>Audio</span></button>
           <button class="editor-tab" data-editor-tab="export" title="Xuất"><b>↗</b><span>Xuất</span></button>
@@ -152,6 +154,13 @@
             <label class="range-field"><span><b>VỊ TRÍ DƯỚI</b><output id="editMarginOut">110</output></span><input id="editSubtitleMargin" type="range" min="20" max="400" value="110"></label>
             <label class="range-field"><span><b>NỀN CAPTION</b><output id="editCaptionOut">48%</output></span><input id="editCaptionOpacity" type="range" min="0" max="0.9" step="0.05" value="0.48"></label>
           </div>
+          <div class="editor-pane" data-editor-pane="image">
+            <h3>CHỈNH HÌNH ẢNH</h3>
+            <label class="range-field"><span><b>ĐỘ SÁNG</b><output id="editBrightnessOut">0</output></span><input id="editBrightness" type="range" min="-1" max="1" step="0.05" value="0"></label>
+            <label class="range-field"><span><b>TƯƠNG PHẢN</b><output id="editContrastOut">1.00</output></span><input id="editContrast" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+            <label class="range-field"><span><b>BÃO HÒA</b><output id="editSaturationOut">1.00</output></span><input id="editSaturation" type="range" min="0" max="3" step="0.05" value="1"></label>
+            <p class="editor-note">Các thông số áp dụng lên toàn bộ track video khi render master.</p>
+          </div>
           <div class="editor-pane" data-editor-pane="brand">
             <h3>THƯƠNG HIỆU</h3>
             <label class="field"><span>VỊ TRÍ LOGO</span><select id="editLogoPosition"><option value="top-right">Trên phải</option><option value="top-left">Trên trái</option><option value="bottom-right">Dưới phải</option><option value="bottom-left">Dưới trái</option></select></label>
@@ -160,7 +169,10 @@
           </div>
           <div class="editor-pane" data-editor-pane="audio">
             <h3>ÂM THANH</h3>
+            <label class="range-field"><span><b>VOICE</b><output id="editVoiceOut">100%</output></span><input id="editVoiceVolume" type="range" min="0" max="2" step="0.05" value="1"></label>
             <label class="range-field"><span><b>NHẠC NỀN</b><output id="editMusicOut">12%</output></span><input id="editMusicVolume" type="range" min="0" max="0.5" step="0.01" value="0.12"></label>
+            <label class="range-field"><span><b>FADE IN</b><output id="editFadeInOut">0.0s</output></span><input id="editFadeIn" type="range" min="0" max="5" step="0.25" value="0"></label>
+            <label class="range-field"><span><b>FADE OUT</b><output id="editFadeOutOut">0.0s</output></span><input id="editFadeOut" type="range" min="0" max="5" step="0.25" value="0"></label>
             <p class="editor-note">Voice được chuẩn hóa -16 LUFS và tự động ducking nhạc.</p>
           </div>
           <div class="editor-pane" data-editor-pane="export">
@@ -200,6 +212,6 @@
     </form>
   </dialog>
   <div class="toast" id="toast"></div>
-  <script src="/assets/app.js?v=20260727-4"></script>
+  <script src="/assets/app.js?v=20260728-1"></script>
 </body>
 </html>

@@ -27,6 +27,12 @@ class RenderOptions:
     subtitle_margin: int = 110
     subtitle_color: str = "white"
     caption_opacity: float = 0.48
+    brightness: float = 0.0
+    contrast: float = 1.0
+    saturation: float = 1.0
+    voice_volume: float = 1.0
+    audio_fade_in: float = 0.0
+    audio_fade_out: float = 0.0
 
 
 def render(
@@ -54,6 +60,7 @@ def render(
     video_filters = [
         f"scale={scale_w}:{scale_h}:force_original_aspect_ratio=increase",
         f"crop={options.width}:{options.height}",
+        f"eq=brightness={options.brightness}:contrast={options.contrast}:saturation={options.saturation}",
     ]
     if options.watermark_position != "none":
         video_filters.append(_watermark_filter(options))
@@ -83,16 +90,26 @@ def render(
         "ffmpeg", "-y", "-ss", str(options.trim_seconds), "-t", str(usable), "-i", str(source),
         "-i", str(voiceover),
     ]
+    voice_duration = duration(voiceover)
+    fade_out_start = max(0.0, voice_duration - options.audio_fade_out)
+    voice_filters = [f"volume={options.voice_volume}"]
+    if options.audio_fade_in > 0:
+        voice_filters.append(f"afade=t=in:st=0:d={options.audio_fade_in}")
+    if options.audio_fade_out > 0:
+        voice_filters.append(
+            f"afade=t=out:st={fade_out_start:.3f}:d={options.audio_fade_out}"
+        )
+    voice_chain = ",".join(voice_filters)
     if music:
         command += ["-stream_loop", "-1", "-i", str(music)]
         audio_filter = (
-            "[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[voice][side];"
+            f"[1:a]{voice_chain},loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[voice][side];"
             f"[2:a]volume={options.music_volume}[music];"
             "[music][side]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[ducked];"
             "[voice][ducked]amix=inputs=2:duration=first:dropout_transition=2[aout]"
         )
     else:
-        audio_filter = "[1:a]loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
+        audio_filter = f"[1:a]{voice_chain},loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
     logo_filter = ""
     video_output = "vout"
     if logo:

@@ -330,7 +330,13 @@ const editorRanges = [
   ['editCaptionOpacity', 'editCaptionOut', (v) => `${Math.round(v * 100)}%`],
   ['editLogoWidth', 'editLogoWidthOut', (v) => `${Math.round(v * 100)}%`],
   ['editLogoOpacity', 'editLogoOpacityOut', (v) => `${Math.round(v * 100)}%`],
-  ['editMusicVolume', 'editMusicOut', (v) => `${Math.round(v * 100)}%`]
+  ['editMusicVolume', 'editMusicOut', (v) => `${Math.round(v * 100)}%`],
+  ['editBrightness', 'editBrightnessOut', (v) => v.toFixed(2)],
+  ['editContrast', 'editContrastOut', (v) => v.toFixed(2)],
+  ['editSaturation', 'editSaturationOut', (v) => v.toFixed(2)],
+  ['editVoiceVolume', 'editVoiceOut', (v) => `${Math.round(v * 100)}%`],
+  ['editFadeIn', 'editFadeInOut', (v) => `${v.toFixed(2)}s`],
+  ['editFadeOut', 'editFadeOutOut', (v) => `${v.toFixed(2)}s`]
 ];
 editorRanges.forEach(([inputId, outputId, format]) => $(`#${inputId}`).addEventListener('input', (event) => {
   $(`#${outputId}`).value = format(Number(event.target.value));
@@ -394,6 +400,7 @@ async function updateJob(jobId) {
     const response = await fetch(`/api/jobs/${jobId}`); const job = await response.json();
     $('#progressNumber').textContent = `${job.progress}%`; $('#progressBar').style.width = `${job.progress}%`;
     $('#stageList').innerHTML = Object.entries(job.stages).map(([name, status]) => `<div class="stage ${status}"><i></i><span>${name.toUpperCase()}</span></div>`).join('');
+    renderJobLogs(job.logs || []);
     if (job.status === 'failed') {
       clearInterval(pollTimer); $('#errorBox').hidden = false; $('#errorMessage').textContent = job.error;
       resetButton();
@@ -446,6 +453,28 @@ function selectCue(index, cue) {
   document.querySelectorAll('.cue-editor-row').forEach((item, rowIndex) => item.classList.toggle('active', rowIndex === index));
   document.querySelectorAll('.cue-editor-row')[index]?.scrollIntoView({block: 'nearest'});
 }
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
+}
+
+function renderJobLogs(logs) {
+  const list = $('#jobLogList');
+  if (!logs.length) { list.innerHTML = '<p>Chưa có log.</p>'; return; }
+  const stickToBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  list.innerHTML = logs.map((entry) => {
+    const time = new Date(entry.time).toLocaleTimeString('vi-VN');
+    return `<div class="job-log-entry ${escapeHtml(entry.level)}"><time>${time}</time><b>${escapeHtml(entry.stage || 'SYSTEM')}</b><span>${escapeHtml(entry.message)}</span></div>`;
+  }).join('');
+  if (stickToBottom) list.scrollTop = list.scrollHeight;
+}
+
+function toggleLog(force) {
+  const panel = $('#jobLogPanel'); panel.hidden = typeof force === 'boolean' ? !force : !panel.hidden;
+  $('#toggleLogButton').textContent = panel.hidden ? 'XEM LOG' : 'ẨN LOG';
+}
+$('#toggleLogButton').addEventListener('click', () => toggleLog());
+$('#closeLogButton').addEventListener('click', () => toggleLog(false));
 
 function voiceOptions(selected) {
   return [...$('#ttsVoice').options].filter((option) => option.dataset.lang === $('#targetLanguage').value)
@@ -512,7 +541,13 @@ $('#applyEditorButton').addEventListener('click', async () => {
     music_volume: Number($('#editMusicVolume').value),
     logo_position: $('#editLogoPosition').value,
     logo_width: Number($('#editLogoWidth').value),
-    logo_opacity: Number($('#editLogoOpacity').value)
+    logo_opacity: Number($('#editLogoOpacity').value),
+    brightness: Number($('#editBrightness').value),
+    contrast: Number($('#editContrast').value),
+    saturation: Number($('#editSaturation').value),
+    voice_volume: Number($('#editVoiceVolume').value),
+    audio_fade_in: Number($('#editFadeIn').value),
+    audio_fade_out: Number($('#editFadeOut').value)
   };
   const button = $('#applyEditorButton'); button.disabled = true; button.textContent = 'ĐANG RENDER...';
   try {

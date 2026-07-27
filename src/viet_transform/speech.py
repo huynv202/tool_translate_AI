@@ -6,6 +6,7 @@ import importlib.util
 import os
 import time
 import wave
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
@@ -70,7 +71,11 @@ class SpeechChunk:
 
 
 def synthesize_dialogue(
-    lines: list[DialogueLine], output: Path, settings: Settings, work_dir: Path
+    lines: list[DialogueLine],
+    output: Path,
+    settings: Settings,
+    work_dir: Path,
+    detail: Callable[[str], None] | None = None,
 ) -> Path:
     clips_dir = work_dir / "voice-clips"
     clips_dir.mkdir(parents=True, exist_ok=True)
@@ -88,6 +93,8 @@ def synthesize_dialogue(
     )
     clips: list[tuple[Path, SpeechChunk, float]] = []
     for chunk in chunks:
+        if detail and (chunk.index == 1 or chunk.index % 25 == 0 or chunk.index == len(chunks)):
+            detail(f"TTS cue {chunk.index}/{len(chunks)} tai {chunk.start:.1f}s")
         chunk_voice = chunk.voice or settings.tts_voice
         chunk_speaker = chunk.speaker if chunk.speaker is not None else settings.tts_speaker
         chunk_uses_piper = chunk_voice.startswith("vi-piper-") or (not chunk.voice and use_piper)
@@ -138,7 +145,7 @@ def synthesize_dialogue(
         clips.append((clip, chunk, clip_duration))
 
     total_duration = max(line.end for line in lines) + 0.5
-    _assemble_timeline(clips, output, work_dir, total_duration)
+    _assemble_timeline(clips, output, work_dir, total_duration, detail=detail)
     return output
 
 
@@ -163,12 +170,16 @@ def _assemble_timeline(
     work_dir: Path,
     total_duration: float,
     batch_size: int = 48,
+    detail: Callable[[str], None] | None = None,
 ) -> None:
     batches_dir = work_dir / "voice-batches"
     batches_dir.mkdir(parents=True, exist_ok=True)
     batch_outputs: list[Path] = []
     cursor = 0.0
     for batch_index, start in enumerate(range(0, len(clips), batch_size), start=1):
+        if detail:
+            total_batches = (len(clips) + batch_size - 1) // batch_size
+            detail(f"Ghep voice batch {batch_index}/{total_batches}")
         batch = clips[start : start + batch_size]
         signature = f"cursor={cursor:.3f}|" + "|".join(
             f"{clip.name}:{chunk.start:.3f}:{chunk.end:.3f}:{clip_duration:.3f}"

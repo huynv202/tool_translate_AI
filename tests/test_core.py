@@ -129,11 +129,24 @@ def test_render_applies_editor_subtitle_style(
         subtitles,
         tmp_path / "out.mp4",
         "Montserrat",
-        options=RenderOptions(subtitle_font_size=16, subtitle_color="yellow"),
+        options=RenderOptions(
+            subtitle_font_size=16,
+            subtitle_color="yellow",
+            brightness=0.1,
+            contrast=1.2,
+            saturation=1.3,
+            voice_volume=0.8,
+            audio_fade_in=1.0,
+            audio_fade_out=1.5,
+        ),
     )
     command = " ".join(captured)
     assert "FontSize=16" in command
     assert "PrimaryColour=&H0000FFFF" in command
+    assert "eq=brightness=0.1:contrast=1.2:saturation=1.3" in command
+    assert "volume=0.8" in command
+    assert "afade=t=in:st=0:d=1.0" in command
+    assert "afade=t=out:st=8.500:d=1.5" in command
     assert "veryfast" in captured
     assert "128k" in captured
 

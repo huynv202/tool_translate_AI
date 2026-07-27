@@ -92,3 +92,13 @@ def test_chunked_upload_is_reassembled(monkeypatch, tmp_path) -> None:
 def test_voice_catalog_contains_long_video_local_voice() -> None:
     voices = client.get("/api/voices").json()["voices"]
     assert any(voice["engine"] == "piper" for voice in voices)
+
+
+def test_job_public_payload_contains_structured_logs() -> None:
+    from viet_transform.web import Job
+
+    job = Job(id="log-test")
+    job.add_log("Bat dau thu nghiem", stage="Test")
+    payload = job.public()
+    assert payload["logs"][0]["stage"] == "Test"
+    assert payload["logs"][0]["message"] == "Bat dau thu nghiem"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 
@@ -72,7 +73,10 @@ def transcribe_text(audio: Path, model_name: str, language: str | None = None) -
 
 
 def transcribe_dialogue(
-    audio: Path, model_name: str, language: str | None = "zh"
+    audio: Path,
+    model_name: str,
+    language: str | None = "zh",
+    detail: Callable[[str], None] | None = None,
 ) -> list[DialogueLine]:
     audio_duration = duration(audio)
     ranges = _chunk_ranges(audio, audio_duration) if audio_duration > 60 else [(0.0, audio_duration)]
@@ -80,6 +84,10 @@ def transcribe_dialogue(
     chunks_dir.mkdir(parents=True, exist_ok=True)
     lines: list[DialogueLine] = []
     for chunk_index, (start, end) in enumerate(ranges, start=1):
+        if detail and (chunk_index == 1 or chunk_index % 5 == 0 or chunk_index == len(ranges)):
+            detail(
+                f"STT doan {chunk_index}/{len(ranges)} ({start:.1f}s-{end:.1f}s)"
+            )
         chunk = chunks_dir / f"chunk-{chunk_index:04d}-{start:.3f}-{end:.3f}.wav"
         if not chunk.exists() or chunk.stat().st_size == 0:
             _extract_chunk(audio, chunk, start, end)

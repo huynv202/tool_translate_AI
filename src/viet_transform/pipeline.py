@@ -56,6 +56,7 @@ def execute(
     options: PipelineOptions,
     settings: Settings,
     progress: ProgressCallback | None = None,
+    detail: Callable[[str], None] | None = None,
 ) -> Path:
     require_binaries()
     settings.validate_api_keys()
@@ -75,7 +76,7 @@ def execute(
         "Nhan dang tieng Trung",
         options.resume,
         lambda: _extract_source_dialogue(
-            source, source_audio, source_dialogue, options.work_dir, settings
+            source, source_audio, source_dialogue, options.work_dir, settings, detail
         ),
         progress,
     )
@@ -102,7 +103,11 @@ def execute(
         "Tao giong doc",
         options.resume,
         lambda: synthesize_dialogue(
-            timed_lines, options.work_dir / "voiceover.mp3", settings, options.work_dir
+            timed_lines,
+            options.work_dir / "voiceover.mp3",
+            settings,
+            options.work_dir,
+            detail,
         ),
         progress,
     )
@@ -134,11 +139,16 @@ def execute(
 
 
 def _extract_source_dialogue(
-    video: Path, audio: Path, output: Path, work_dir: Path, settings: Settings
+    video: Path,
+    audio: Path,
+    output: Path,
+    work_dir: Path,
+    settings: Settings,
+    detail: Callable[[str], None] | None = None,
 ) -> Path:
     lines = extract_subtitle_lines(video, work_dir / "source.embedded.srt")
     if not lines:
-        lines = transcribe_dialogue(audio, settings.local_whisper_model, "zh")
+        lines = transcribe_dialogue(audio, settings.local_whisper_model, "zh", detail)
     _write_text(work_dir / "transcript.txt", "\n".join(line.source for line in lines))
     return save_dialogue(lines, output)
 
