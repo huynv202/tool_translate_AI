@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="AI Image Storytelling Studio">
+  <title>Storytelling Studio · Viet Transform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260728-18">
+</head>
+<body class="storytelling-body">
+  <div class="noise"></div>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">VT</span><span>TRANSFORM<br>STUDIO</span></a>
+    <nav class="view-nav" aria-label="Điều hướng sản phẩm"><a href="/">Trang chủ</a><a href="/translate">Dịch video</a><a href="/storytelling" class="active">Storytelling</a></nav>
+    <button class="ghost-button" type="button" id="storySettings">Cấu hình AI</button>
+  </header>
+
+  <main class="story-main">
+    <section class="story-hero"><div><p class="eyebrow">IMAGE STORYTELLING · WORKFLOW 02</p><h1>LỜI KỂ DẪN ĐƯỜNG.<br><span>HÌNH ẢNH THEO SAU.</span></h1><p class="lead">Không cần video nguồn. Đưa cốt truyện, thoại và tư liệu ảnh; AI sẽ chia scene, chọn bố cục và tạo phần hình còn thiếu.</p></div><div class="story-status"><i></i><span>WORKFLOW MỚI</span><strong>IMAGE<br>+ VOICE</strong></div></section>
+
+    <form class="story-workspace" id="storyForm">
+      <section class="story-inputs">
+        <div class="story-section-head"><span>01</span><div><p>NỘI DUNG GỐC</p><h2>Viết câu chuyện cần kể</h2></div></div>
+        <label class="field"><span>CỐT TRUYỆN / BỐI CẢNH · BẮT BUỘC</span><textarea id="storyContext" class="narration-input" placeholder="Mô tả nhân vật, bối cảnh, diễn biến, thông điệp và điều người xem cần cảm nhận. AI sẽ tự viết toàn bộ lời kể từ nội dung này..."></textarea></label>
+        <div class="ai-writer-note"><b>AI SCRIPTWRITER</b><p>Tự viết hook, lời dẫn và kết thúc; sau đó chia thành scene, đồng bộ voice, subtitle và hình ảnh.</p></div>
+        <label class="switch-row story-script-toggle"><span><b>TỰ NHẬP LỜI KỂ</b><small>Tùy chọn nâng cao nếu bạn muốn khóa nội dung thoại</small></span><input id="manualNarrationToggle" type="checkbox"><i></i></label>
+        <label class="field" id="manualNarrationField" hidden><span>LỜI KỂ CỐ ĐỊNH · KHÔNG BẮT BUỘC</span><textarea id="storyNarration" placeholder="Dán lời kể nếu không muốn AI tự viết..."></textarea></label>
+        <div class="story-prompt-grid"><label class="field"><span>ĐỘ DÀI MỤC TIÊU</span><select id="storyDuration"><option value="60">Khoảng 60 giây</option><option value="90">Khoảng 90 giây</option><option value="180">Khoảng 3 phút</option><option value="300">Khoảng 5 phút</option><option value="600">Khoảng 10 phút</option></select></label><label class="field"><span>GIỌNG KỂ</span><select id="storyTone"><option>Bình tĩnh, điện ảnh</option><option>Lôi cuốn, bí ẩn</option><option>Ấm áp, cảm xúc</option><option>Nhanh, giàu năng lượng</option><option>Tài liệu, khách quan</option></select></label><label class="field"><span>PHONG CÁCH HÌNH ẢNH</span><select id="storyStyle"><option>Điện ảnh chân thực</option><option>Minh họa kể chuyện</option><option>Tài liệu lịch sử</option><option>Anime điện ảnh</option><option>Tranh sơn dầu</option></select></label><label class="field"><span>TỶ LỆ VIDEO</span><select id="storyRatio"><option value="9:16">9:16 · Shorts / TikTok</option><option value="16:9">16:9 · YouTube</option><option value="1:1">1:1 · Social post</option></select></label></div>
+      </section>
+
+      <section class="story-assets">
+        <div class="story-section-head"><span>02</span><div><p>VISUAL LIBRARY</p><h2>Ảnh có sẵn và ảnh AI</h2></div></div>
+        <label class="story-dropzone" id="storyDropzone"><input id="storyImages" type="file" accept="image/*" multiple><b>＋</b><strong>THẢ ẢNH THAM CHIẾU VÀO ĐÂY</strong><small>Không bắt buộc · JPG, PNG, WEBP</small></label>
+        <div class="asset-mode-grid"><label><input type="radio" name="assetMode" value="hybrid" checked><span><b>KẾT HỢP</b><small>Dùng ảnh tải lên và sinh phần còn thiếu</small></span></label><label><input type="radio" name="assetMode" value="generated"><span><b>AI TẠO TOÀN BỘ</b><small>Sinh ảnh theo từng scene</small></span></label><label><input type="radio" name="assetMode" value="uploaded"><span><b>CHỈ ẢNH CÓ SẴN</b><small>Không gọi model tạo ảnh</small></span></label></div>
+        <div class="image-preview-grid" id="storyImagePreview"><div class="empty-image-state"><span>0</span><p>Ảnh tải lên sẽ xuất hiện tại đây</p></div></div>
+      </section>
+
+      <section class="story-direction">
+        <div class="story-section-head"><span>03</span><div><p>AI DIRECTION</p><h2>Chỉ đạo cách kể bằng hình</h2></div></div>
+        <label class="field"><span>PROMPT ĐẠO DIỄN</span><textarea id="directorPrompt" placeholder="Ví dụ: Nhịp chậm, giàu khoảng lặng; ưu tiên cận cảnh nhân vật; màu lạnh ở đầu và ấm dần về cuối..."></textarea></label>
+        <div class="direction-rules"><span><b>CONSISTENCY</b>Giữ nhân vật và phong cách xuyên suốt</span><span><b>NO MOTION</b>Ảnh tĩnh, chỉ chuyển scene nhẹ</span><span><b>AI LAYOUT</b>Tự chọn crop, vị trí và khoảng trống chữ</span></div>
+      </section>
+
+      <section class="story-launch"><div><span class="ready-dot"></span><strong>SẴN SÀNG TẠO STORYBOARD</strong><small>AI sẽ tạo visual bible, chia scene và đề xuất prompt ảnh trước khi render.</small></div><button type="button" id="storyLaunchButton">TẠO STORYBOARD <b>↗</b></button></section>
+    </form>
+
+    <section class="storyboard-preview" id="storyboardPreview" hidden><div class="storyboard-heading"><div><p class="eyebrow">AI STORYBOARD</p><h2>Bố cục câu chuyện</h2></div><span>CHƯA KẾT NỐI PIPELINE RENDER</span></div><div class="storyboard-lane" id="storyboardLane"></div></section>
+  </main>
+  <dialog id="storySettingsDialog">
+    <form method="dialog" class="dialog-card" id="storySettingsForm">
+      <div class="dialog-head"><div><p>STORYTELLING CONNECTION</p><h2>Kết nối AI viết storyboard</h2></div><button value="cancel" aria-label="Đóng">×</button></div>
+      <label class="field wide"><span>9ROUTER API KEY</span><input type="password" id="storyRouterKey" autocomplete="off" required></label>
+      <label class="field wide"><span>BASE URL</span><input type="url" id="storyRouterUrl" value="http://localhost:20128/v1" required></label>
+      <label class="field wide"><span>MODEL VIẾT KỊCH BẢN</span><select id="storyScriptModel" required><option value="">Tải danh sách model</option></select></label>
+      <div class="dialog-note">Ảnh và video dùng Gemini API trực tiếp, tách biệt hoàn toàn với 9Router.</div>
+      <label class="field wide"><span>GEMINI API KEY · IMAGE / VIDEO</span><input type="password" id="geminiMediaKey" autocomplete="off" placeholder="Google AI Studio API key"></label>
+      <div class="dialog-grid"><label class="field"><span>MODEL TẠO ẢNH</span><input id="geminiImageModel" value="imagen-4.0-generate-001"></label><label class="field"><span>MODEL TẠO VIDEO</span><input id="geminiVideoModel" placeholder="Nhập model video được cấp quyền"></label></div>
+      <div class="router-status" id="storyRouterStatus"><i></i><span>Sẵn sàng tải model từ 9Router.</span></div>
+      <div class="dialog-actions"><button type="button" class="probe-button" id="storyLoadModels">TẢI MODEL</button><button class="save-button" value="default">LƯU CẤU HÌNH</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast"></div>
+  <script src="/assets/storytelling.js?v=20260728-18"></script>
+</body>
+</html>

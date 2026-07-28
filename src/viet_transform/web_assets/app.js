@@ -7,8 +7,24 @@ let currentJobId = null;
 let currentDialogue = [];
 let currentVideoUrl = null;
 let batchDirectoryHandle = null;
-let batchRunning = false;
 let selectedCueIndex = 0;
+let updatingCueId = null;
+
+function updateProjectAssetLinks(assets = {}) {
+  const links = [
+    ['#downloadProjectVideo', assets.video],
+    ['#downloadProjectVoice', assets.voice],
+    ['#downloadProjectSubtitles', assets.subtitles]
+  ];
+  links.forEach(([selector, url]) => {
+    const link = $(selector);
+    if (url) {
+      link.href = url; link.classList.remove('disabled'); link.setAttribute('aria-disabled', 'false');
+    } else {
+      link.removeAttribute('href'); link.classList.add('disabled'); link.setAttribute('aria-disabled', 'true');
+    }
+  });
+}
 
 function toast(message) {
   const node = $('#toast'); node.textContent = message; node.classList.add('show');
@@ -127,20 +143,19 @@ videoInput.addEventListener('change', showVideos);
 function showVideos() {
   const files = [...videoInput.files];
   if (!files.length) return;
-  if (files.length > 10) { videoInput.value = ''; toast('Mỗi hàng đợi chỉ được chọn tối đa 10 video'); return; }
+  if (files.length > 1) { videoInput.value = ''; toast('Hiện tại mỗi project chỉ nhận một video'); return; }
   const file = files[0];
   $('#fileTitle').textContent = file.name;
-  $('#fileMeta').textContent = files.length === 1 ? `${(file.size / 1048576).toFixed(1)} MB · sẽ upload an toàn theo từng phần` : `${files.length} video · sẽ render tuần tự`;
+  $('#fileMeta').textContent = `${(file.size / 1048576).toFixed(1)} MB · sẽ upload an toàn theo từng phần`;
   $('#previewName').textContent = file.name;
   $('#sourcePreview').src = URL.createObjectURL(file);
   $('#miniPreview').hidden = false;
-  renderBatchList(files.map((item, index) => ({name: item.name, status: 'pending', message: `Chờ xử lý · ${(item.size / 1048576).toFixed(1)} MB`, index})));
 }
 
 $('#removeVideo').addEventListener('click', () => {
   videoInput.value = ''; $('#miniPreview').hidden = true;
-  $('#fileTitle').textContent = 'KÉO TỐI ĐA 10 VIDEO VÀO ĐÂY';
-  $('#fileMeta').textContent = 'MP4, MOV, WEBM · nguồn bạn có quyền sử dụng';
+  $('#fileTitle').textContent = 'KÉO 1 VIDEO VÀO ĐÂY';
+  $('#fileMeta').textContent = 'MP4, MOV, WEBM · mỗi project dùng một video';
   $('#batchList').innerHTML = '<div class="batch-empty">Chưa có video trong hàng đợi</div>';
 });
 
@@ -182,6 +197,39 @@ $('input[name=voice_reference]').addEventListener('change', (event) => {
 });
 
 $('#targetLanguage').addEventListener('change', updateVoices);
+$('#contentMode').addEventListener('change', (event) => {
+  if (event.target.value === 'creator-analysis') toast('Chế độ này tạo lời kể phân tích, không dịch sát lời thoại gốc');
+});
+$('#fillEditorialSample').addEventListener('click', async () => {
+  const topic = $('#editorialTopic').value.trim();
+  if (!topic) { toast('Hãy nhập chủ đề video trước'); $('#editorialTopic').focus(); return; }
+  const apiKey = sessionStorage.getItem('routerKey');
+  const model = localStorage.getItem('scriptModel');
+  if (!apiKey || !model) { loadConfig(); dialog.showModal(); toast('Hãy cấu hình 9Router và model biên tập trước'); return; }
+  const button = $('#fillEditorialSample'); button.disabled = true; button.textContent = 'ĐANG XÂY BRIEF...';
+  try {
+    const response = await fetch('/api/editorial/brief', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        api_key: apiKey,
+        base_url: localStorage.getItem('routerUrl') || 'http://localhost:20128/v1',
+        model,
+        topic,
+        description: $('#editorialDescription').value.trim()
+      })
+    });
+    const brief = await response.json();
+    if (response.status === 404) throw new Error('Server đang chạy bản cũ. Hãy khởi động lại Viet Transform Studio rồi thử lại.');
+    if (!response.ok) throw new Error(brief.detail || 'Không tạo được brief biên tập');
+    $('#contentMode').value = 'creator-analysis';
+    $('#editorialThesis').value = brief.thesis;
+    $('#vietnamAngle').value = brief.vietnam_angle;
+    const result = $('#editorialBriefResult'); result.hidden = false;
+    result.innerHTML = `<div><span>HOOK ĐỀ XUẤT</span><strong>${escapeHtml(brief.hook)}</strong></div><div><span>CẤU TRÚC BIÊN TẬP</span><ol>${brief.structure.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol></div><div><span>CẦN NGHIÊN CỨU</span><ul>${brief.research_queries.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul><small>Hãy tìm nguồn thật cho các câu hỏi này và dán URL vào ô Nguồn nghiên cứu.</small></div>`;
+    toast('Đã tạo DNA biên tập theo chủ đề');
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; button.textContent = 'TẠO LẠI DNA BIÊN TẬP'; }
+});
 $('#ttsVoice').addEventListener('change', syncVoiceEngine);
 function updateVoices() {
   const language = $('#targetLanguage').value; const voices = [...$('#ttsVoice').options];
@@ -334,6 +382,9 @@ const editorRanges = [
   ['editBrightness', 'editBrightnessOut', (v) => v.toFixed(2)],
   ['editContrast', 'editContrastOut', (v) => v.toFixed(2)],
   ['editSaturation', 'editSaturationOut', (v) => v.toFixed(2)],
+  ['editHue', 'editHueOut', (v) => `${Math.round(v)}°`],
+  ['editBlur', 'editBlurOut', (v) => v.toFixed(1)],
+  ['editVignette', 'editVignetteOut', (v) => `${Math.round(v * 100)}%`],
   ['editVoiceVolume', 'editVoiceOut', (v) => `${Math.round(v * 100)}%`],
   ['editFadeIn', 'editFadeInOut', (v) => `${v.toFixed(2)}s`],
   ['editFadeOut', 'editFadeOutOut', (v) => `${v.toFixed(2)}s`]
@@ -341,6 +392,47 @@ const editorRanges = [
 editorRanges.forEach(([inputId, outputId, format]) => $(`#${inputId}`).addEventListener('input', (event) => {
   $(`#${outputId}`).value = format(Number(event.target.value));
 }));
+
+const colorPresets = {
+  original: [0, 1, 1, 0, 0, 0],
+  cinematic: [-0.05, 1.22, 0.82, -8, 0, 0.28],
+  warm: [0.04, 1.08, 1.18, -12, 0, 0.12],
+  cool: [-0.02, 1.1, 0.92, 14, 0, 0.1],
+  mono: [0, 1.18, 0, 0, 0, 0.2],
+  vivid: [0.03, 1.2, 1.45, 4, 0, 0.08]
+};
+
+function updateLivePreview() {
+  const brightness = Math.max(0, 1 + Number($('#editBrightness').value));
+  const contrast = Number($('#editContrast').value);
+  const saturation = Number($('#editSaturation').value);
+  const hue = Number($('#editHue').value);
+  const blur = Number($('#editBlur').value);
+  $('#resultVideo').style.filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) hue-rotate(${hue}deg) blur(${blur}px)`;
+  $('#previewVignette').style.opacity = Number($('#editVignette').value);
+
+  const subtitle = $('#subtitlePreview');
+  const colors = {white: '#fff', yellow: '#ffe65a', cyan: '#61efff'};
+  subtitle.style.color = colors[$('#editSubtitleColor').value] || '#fff';
+  subtitle.style.fontFamily = $('#editFont').value;
+  subtitle.style.fontSize = `${Math.max(14, Number($('#editSubtitleSize').value) * 1.55)}px`;
+  subtitle.style.bottom = `${Math.max(3, Number($('#editSubtitleMargin').value) / 19.2)}%`;
+  subtitle.style.background = `rgba(0,0,0,${Number($('#editCaptionOpacity').value)})`;
+  $('#editorSaveState').textContent = 'Preview đã cập nhật · cần xuất để tạo MP4';
+}
+
+['editBrightness', 'editContrast', 'editSaturation', 'editHue', 'editBlur', 'editVignette', 'editSubtitleSize', 'editSubtitleMargin', 'editCaptionOpacity'].forEach((id) => {
+  $(`#${id}`).addEventListener('input', () => { if (id.startsWith('editB') || ['editContrast', 'editSaturation', 'editHue', 'editBlur', 'editVignette'].includes(id)) $('#editColorPreset').value = 'custom'; updateLivePreview(); });
+});
+['editFont', 'editSubtitleColor'].forEach((id) => $(`#${id}`).addEventListener('change', updateLivePreview));
+$('#editColorPreset').addEventListener('change', (event) => {
+  const preset = colorPresets[event.target.value]; if (!preset) return;
+  ['editBrightness', 'editContrast', 'editSaturation', 'editHue', 'editBlur', 'editVignette'].forEach((id, index) => {
+    $(`#${id}`).value = preset[index]; $(`#${id}`).dispatchEvent(new Event('input'));
+  });
+  event.target.value = Object.keys(colorPresets).find((name) => colorPresets[name] === preset) || 'custom';
+  updateLivePreview();
+});
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -364,14 +456,6 @@ form.addEventListener('submit', async (event) => {
   if (voiceOption?.dataset.speaker) data.set('tts_speaker', voiceOption.dataset.speaker);
   const button = $('#launchButton'); button.disabled = true; button.querySelector('span').textContent = 'ĐANG KHỞI TẠO...';
   try {
-    const selectedFiles = [...videoInput.files];
-    if (selectedFiles.length > 1) {
-      if ('showDirectoryPicker' in window && !batchDirectoryHandle) {
-        try { await chooseDraftFolder(); }
-        catch (error) { if (error.name !== 'AbortError') throw error; }
-      }
-      await processBatch(selectedFiles, data); return;
-    }
     if (videoInput.files[0]) {
       button.querySelector('span').textContent = 'ĐANG UPLOAD 0%';
       const uploadId = await uploadLargeVideo(videoInput.files[0], (percent) => { button.querySelector('span').textContent = `ĐANG UPLOAD ${percent}%`; $('#fileMeta').textContent = `${(videoInput.files[0].size / 1048576).toFixed(1)} MB · ${percent}%`; });
@@ -399,23 +483,61 @@ async function updateJob(jobId) {
   try {
     const response = await fetch(`/api/jobs/${jobId}`); const job = await response.json();
     $('#progressNumber').textContent = `${job.progress}%`; $('#progressBar').style.width = `${job.progress}%`;
-    $('#stageList').innerHTML = Object.entries(job.stages).map(([name, status]) => `<div class="stage ${status}"><i></i><span>${name.toUpperCase()}</span></div>`).join('');
+    const stages = Object.entries(job.stages).filter((_, index) => job.phase !== 'prepare' || index < 6);
+    $('#stageList').innerHTML = stages.map(([name, status]) => `<div class="stage ${status}"><i></i><span>${name.toUpperCase()}</span></div>`).join('');
     renderJobLogs(job.logs || []);
+    if (job.status === 'running' && job.phase === 'render') {
+      $('#applyEditorButton').disabled = true;
+      $('#applyEditorButton').textContent = `ĐANG XUẤT · ${job.progress}%`;
+    }
     if (job.status === 'failed') {
       clearInterval(pollTimer); $('#errorBox').hidden = false; $('#errorMessage').textContent = job.error;
+      $('#applyEditorButton').disabled = false; $('#applyEditorButton').textContent = 'THỬ XUẤT LẠI';
+      if (updatingCueId !== null) {
+        const row = document.querySelector(`.cue-editor-row[data-cue-id="${updatingCueId}"]`);
+        row?.classList.remove('loading'); row?.classList.add('dirty');
+        const cueButton = row?.querySelector('.cue-apply-button');
+        if (cueButton) { cueButton.disabled = false; cueButton.textContent = 'THỬ LẠI CUE'; }
+        updatingCueId = null;
+        toast(`Không thể cập nhật cue: ${job.error}`);
+      }
       resetButton();
     }
-    if (job.status === 'completed') {
+    if (job.status === 'ready' || job.status === 'completed') {
       clearInterval(pollTimer); $('#resultGrid').hidden = false;
       currentVideoUrl = job.video_url;
-      $('#resultVideo').src = job.video_url;
+      const previewUrl = job.preview_url || job.video_url;
+      if ($('#resultVideo').dataset.previewUrl !== previewUrl) {
+        $('#resultVideo').src = previewUrl;
+        $('#resultVideo').dataset.previewUrl = previewUrl;
+      }
+      if (job.voice_url && $('#voicePreviewAudio').dataset.voiceUrl !== job.voice_url) {
+        $('#voicePreviewAudio').src = job.voice_url;
+        $('#voicePreviewAudio').dataset.voiceUrl = job.voice_url;
+      }
       $('#scriptEditor').value = job.artifacts.script || '';
       currentDialogue = job.artifacts.dialogue || [];
+      const cueWasUpdated = updatingCueId !== null;
+      updatingCueId = null;
       buildTimeline(currentDialogue);
       buildCueEditor();
       updateWordCount();
-      $('#regenerateButton').disabled = false;
-      $('#regenerateButton').innerHTML = 'TẠO LẠI TỪ KỊCH BẢN NÀY <span>↻</span>';
+      const rendered = job.status === 'completed';
+      $('#editorProjectName').textContent = $('#previewName').textContent || `Project ${job.id}`;
+      if (job.editorial?.content_mode) {
+        $('#contentMode').value = job.editorial.content_mode;
+        $('#editorialThesis').value = job.editorial.editorial_thesis || '';
+        $('#vietnamAngle').value = job.editorial.vietnam_angle || '';
+        $('#researchSources').value = (job.editorial.research_sources || []).join('\n');
+      }
+      $('#editorSaveState').textContent = rendered ? 'Đã có bản xuất · preview vẫn dùng project gốc' : 'Cue đã sẵn sàng để chỉnh sửa';
+      $('#downloadButton').disabled = !rendered;
+      $('#downloadButton').innerHTML = rendered ? 'LƯU VIDEO VỀ MÁY <span>↓</span>' : 'CHƯA CÓ BẢN RENDER <span>↓</span>';
+      updateProjectAssetLinks(job.capcut_assets);
+      $('#applyEditorButton').textContent = rendered ? 'XUẤT LẠI VIDEO' : 'XUẤT VIDEO';
+      updateLivePreview();
+      loadReadinessAnswers();
+      if (cueWasUpdated) toast('Cue đã được tạo lại giọng và đồng bộ phụ đề');
       resetButton(); $('#resultGrid').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   } catch (error) { clearInterval(pollTimer); toast(`Mất kết nối: ${error.message}`); resetButton(); }
@@ -483,23 +605,58 @@ function voiceOptions(selected) {
 
 function syncScriptFromCues() {
   $('#scriptEditor').value = currentDialogue.map((line) => line.translation).join('\n');
-  updateWordCount(); buildTimeline(currentDialogue);
+  $('#editorSaveState').textContent = 'Có cue chưa xác nhận';
+  updateWordCount(); buildTimeline(currentDialogue); updateSubtitleAtCurrentTime();
+}
+
+async function applyCueUpdate(line, row) {
+  if (!currentJobId || updatingCueId !== null) return;
+  const button = row.querySelector('.cue-apply-button');
+  updatingCueId = line.id;
+  row.classList.remove('dirty'); row.classList.add('loading');
+  button.disabled = true; button.textContent = 'ĐANG TẠO GIỌNG...';
+  $('#editorSaveState').textContent = `Đang cập nhật cue ${line.id}`;
+  try {
+    const response = await fetch(`/api/jobs/${currentJobId}/cues/${line.id}`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        start: Number(line.start), end: Number(line.end),
+        translation: line.translation, voice: line.voice || null,
+        speaker: line.speaker ?? null
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || 'Không thể cập nhật cue');
+    clearInterval(pollTimer);
+    pollTimer = setInterval(() => updateJob(currentJobId), 900);
+    updateJob(currentJobId);
+  } catch (error) {
+    updatingCueId = null;
+    row.classList.remove('loading'); row.classList.add('dirty');
+    button.disabled = false; button.textContent = 'THỬ LẠI CUE';
+    $('#editorSaveState').textContent = 'Cue chưa được cập nhật';
+    toast(error.message);
+  }
 }
 
 function buildCueEditor() {
   const list = $('#cueEditorList'); list.innerHTML = '';
   currentDialogue.forEach((line, index) => {
     const row = document.createElement('div'); row.className = `cue-editor-row${index === selectedCueIndex ? ' active' : ''}`;
-    row.innerHTML = `<button type="button" class="cue-index">${String(index + 1).padStart(3, '0')}</button><div class="cue-time"><label>IN<input type="number" min="0" step="0.1" value="${line.start.toFixed(2)}"></label><label>OUT<input type="number" min="0.4" step="0.1" value="${line.end.toFixed(2)}"></label></div><textarea>${line.translation}</textarea><select>${voiceOptions(line.voice || $('#ttsVoice').value)}</select>`;
+    row.dataset.cueId = line.id;
+    row.innerHTML = `<button type="button" class="cue-index">${String(index + 1).padStart(3, '0')}</button><div class="cue-time"><label>IN<input type="number" min="0" step="0.1" value="${line.start.toFixed(2)}"></label><label>OUT<input type="number" min="0.4" step="0.1" value="${line.end.toFixed(2)}"></label></div><textarea>${escapeHtml(line.translation)}</textarea><select>${voiceOptions(line.voice || $('#ttsVoice').value)}</select><button type="button" class="cue-apply-button">XÁC NHẬN CUE</button>`;
     const [startInput, endInput] = row.querySelectorAll('input'); const text = row.querySelector('textarea'); const voice = row.querySelector('select');
+    const markDirty = () => row.classList.add('dirty');
     row.querySelector('.cue-index').addEventListener('click', () => selectCue(index, document.querySelectorAll('.cue-block')[index]));
-    startInput.addEventListener('change', () => { line.start = Number(startInput.value); syncScriptFromCues(); });
-    endInput.addEventListener('change', () => { line.end = Number(endInput.value); syncScriptFromCues(); });
-    text.addEventListener('input', () => { line.translation = text.value; syncScriptFromCues(); });
-    voice.addEventListener('change', () => { line.voice = voice.value; line.speaker = Number(voice.selectedOptions[0].dataset.speaker) || null; });
+    startInput.addEventListener('change', () => { line.start = Number(startInput.value); markDirty(); syncScriptFromCues(); });
+    endInput.addEventListener('change', () => { line.end = Number(endInput.value); markDirty(); syncScriptFromCues(); });
+    text.addEventListener('input', () => { line.translation = text.value; markDirty(); syncScriptFromCues(); });
+    voice.addEventListener('change', () => { line.voice = voice.value; line.speaker = Number(voice.selectedOptions[0].dataset.speaker) || null; markDirty(); syncScriptFromCues(); });
+    row.querySelector('.cue-apply-button').addEventListener('click', () => applyCueUpdate(line, row));
     list.appendChild(row);
   });
-  syncScriptFromCues();
+  $('#scriptEditor').value = currentDialogue.map((line) => line.translation).join('\n');
+  updateWordCount(); updateSubtitleAtCurrentTime();
 }
 
 $('#addCueButton').addEventListener('click', () => {
@@ -525,13 +682,34 @@ function formatTime(seconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+function updateSubtitleAtCurrentTime() {
+  const video = $('#resultVideo');
+  const cue = currentDialogue.find((line) => video.currentTime >= line.start && video.currentTime < line.end);
+  $('#subtitlePreview').textContent = cue?.translation || '';
+  $('#subtitlePreview').hidden = !cue;
+}
+
 $('#resultVideo').addEventListener('timeupdate', (event) => {
   $('#editorTime').textContent = `${formatTime(event.target.currentTime)} / ${formatTime(event.target.duration || 0)}`;
+  updateSubtitleAtCurrentTime();
+});
+$('#resultVideo').addEventListener('play', async (event) => {
+  const audio = $('#voicePreviewAudio'); if (!audio.src) return;
+  audio.currentTime = event.target.currentTime;
+  try { await audio.play(); } catch (error) { if (error.name !== 'AbortError') toast('Không phát được voice preview'); }
+});
+$('#resultVideo').addEventListener('pause', () => $('#voicePreviewAudio').pause());
+$('#resultVideo').addEventListener('seeking', (event) => {
+  const audio = $('#voicePreviewAudio'); if (audio.src) audio.currentTime = event.target.currentTime;
+});
+$('#editVoiceVolume').addEventListener('input', (event) => {
+  $('#voicePreviewAudio').volume = Math.min(1, Number(event.target.value));
 });
 
 $('#applyEditorButton').addEventListener('click', async () => {
   if (!currentJobId) return;
   const payload = {
+    cues: currentDialogue,
     font_name: $('#editFont').value,
     subtitle_font_size: Number($('#editSubtitleSize').value),
     subtitle_margin: Number($('#editSubtitleMargin').value),
@@ -545,20 +723,23 @@ $('#applyEditorButton').addEventListener('click', async () => {
     brightness: Number($('#editBrightness').value),
     contrast: Number($('#editContrast').value),
     saturation: Number($('#editSaturation').value),
+    hue: Number($('#editHue').value),
+    blur: Number($('#editBlur').value),
+    vignette: Number($('#editVignette').value),
     voice_volume: Number($('#editVoiceVolume').value),
     audio_fade_in: Number($('#editFadeIn').value),
     audio_fade_out: Number($('#editFadeOut').value)
   };
-  const button = $('#applyEditorButton'); button.disabled = true; button.textContent = 'ĐANG RENDER...';
+  const button = $('#applyEditorButton'); button.disabled = true; button.textContent = 'ĐANG XUẤT VIDEO...';
   try {
-    const response = await fetch(`/api/jobs/${currentJobId}/render-settings`, {
+    const response = await fetch(`/api/jobs/${currentJobId}/render`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || 'Không thể render lại');
-    $('#resultGrid').hidden = true; pollTimer = setInterval(() => updateJob(currentJobId), 1800); updateJob(currentJobId);
-  } catch (error) { toast(error.message); }
-  finally { button.disabled = false; button.textContent = 'ÁP DỤNG & RENDER LẠI'; }
+    if (!response.ok) throw new Error(result.detail || 'Không thể render video');
+    $('#editorSaveState').textContent = 'Đang xuất video · bạn vẫn có thể xem preview';
+    pollTimer = setInterval(() => updateJob(currentJobId), 1800); updateJob(currentJobId);
+  } catch (error) { toast(error.message); button.disabled = false; button.textContent = 'XUẤT VIDEO'; }
 });
 
 $('#regenerateButton').addEventListener('click', async () => {
@@ -578,7 +759,7 @@ $('#regenerateButton').addEventListener('click', async () => {
 });
 
 function resetButton() {
-  const button = $('#launchButton'); button.disabled = false; button.querySelector('span').textContent = 'TẠO VIDEO MỚI';
+  const button = $('#launchButton'); button.disabled = false; button.querySelector('span').textContent = 'TẠO PROJECT MỚI';
 }
 
 $('#downloadButton').addEventListener('click', async () => {
@@ -612,6 +793,77 @@ $('#downloadButton').addEventListener('click', async () => {
   } finally {
     button.disabled = false; button.innerHTML = original;
   }
+});
+
+const readinessFields = [
+  'rightsBasis', 'evidenceSaved', 'originalCommentary', 'multipleSources', 'factChecked',
+  'syntheticDisclosure', 'advertiserReview', 'thumbnailAccurate', 'metadataReady', 'endScreenReady'
+];
+
+function readinessStorageKey() { return currentJobId ? `youtube-readiness-${currentJobId}` : ''; }
+
+function readinessPayload() {
+  return {
+    rights_basis: $('#rightsBasis').value,
+    evidence_saved: $('#evidenceSaved').checked,
+    original_commentary: $('#originalCommentary').checked,
+    multiple_sources: $('#multipleSources').checked,
+    fact_checked: $('#factChecked').checked,
+    synthetic_disclosure_reviewed: $('#syntheticDisclosure').checked,
+    advertiser_friendly_reviewed: $('#advertiserReview').checked,
+    thumbnail_accurate: $('#thumbnailAccurate').checked,
+    metadata_ready: $('#metadataReady').checked,
+    end_screen_ready: $('#endScreenReady').checked
+  };
+}
+
+function saveReadinessAnswers() {
+  const key = readinessStorageKey(); if (key) localStorage.setItem(key, JSON.stringify(readinessPayload()));
+}
+
+function loadReadinessAnswers() {
+  const key = readinessStorageKey(); if (!key) return;
+  const saved = JSON.parse(localStorage.getItem(key) || '{}');
+  $('#rightsBasis').value = saved.rights_basis || 'unknown';
+  const mapping = {
+    evidenceSaved: 'evidence_saved', originalCommentary: 'original_commentary',
+    multipleSources: 'multiple_sources', factChecked: 'fact_checked',
+    syntheticDisclosure: 'synthetic_disclosure_reviewed', advertiserReview: 'advertiser_friendly_reviewed',
+    thumbnailAccurate: 'thumbnail_accurate', metadataReady: 'metadata_ready', endScreenReady: 'end_screen_ready'
+  };
+  Object.entries(mapping).forEach(([id, field]) => { $(`#${id}`).checked = Boolean(saved[field]); });
+}
+
+readinessFields.forEach((id) => $(`#${id}`).addEventListener('change', saveReadinessAnswers));
+
+function renderReadiness(result) {
+  $('#readinessScore strong').textContent = result.score;
+  $('#readinessScore').className = `readiness-score ${result.verdict}`;
+  $('#readinessVerdict').textContent = result.verdict_label;
+  const gates = ['rights', 'transform', 'editorial', 'publish'];
+  gates.forEach((gate) => {
+    const checks = result.checks.filter((item) => item.gate === gate);
+    const node = document.querySelector(`[data-readiness-gate="${gate}"]`);
+    node.classList.toggle('blocked', checks.some((item) => item.status === 'blocker'));
+    node.classList.toggle('passed', checks.length > 0 && checks.every((item) => item.status === 'pass'));
+  });
+  $('#readinessResults').innerHTML = result.checks.map((item) => `<article class="readiness-result ${item.status}"><i>${item.status === 'pass' ? '✓' : item.status === 'blocker' ? '!' : '·'}</i><div><strong>${escapeHtml(item.label)}</strong><p>${escapeHtml(item.action)}</p></div><b>${item.points}/${item.max_points}</b></article>`).join('') + `<div class="policy-links">${result.sources.map((source) => `<a href="${source.url}" target="_blank" rel="noreferrer">${escapeHtml(source.label)} ↗</a>`).join('')}</div>`;
+  $('#readinessDisclaimer').textContent = result.disclaimer;
+}
+
+$('#checkReadinessButton').addEventListener('click', async () => {
+  if (!currentJobId) return;
+  const button = $('#checkReadinessButton'); button.disabled = true; button.textContent = 'ĐANG KIỂM TRA...';
+  saveReadinessAnswers();
+  try {
+    const response = await fetch(`/api/jobs/${currentJobId}/youtube-readiness`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(readinessPayload())
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'Không kiểm tra được project');
+    renderReadiness(result);
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; button.textContent = 'KIỂM TRA LẠI PROJECT'; }
 });
 
 loadConfig(); updateVoices();

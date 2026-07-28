@@ -63,11 +63,26 @@ def dialogue_srt(lines: list[DialogueLine]) -> str:
 
 
 def parse_json_response(content: str) -> list[dict[str, object]]:
-    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())
-    try:
-        payload = json.loads(cleaned)
-    except json.JSONDecodeError as exc:
-        raise PipelineError("AI khong tra ve JSON hoi thoai hop le.") from exc
+    cleaned = content.strip().lstrip("\ufeff")
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE)
+    candidates = [cleaned]
+    for opening, closing in (("{", "}"), ("[", "]")):
+        start, end = cleaned.find(opening), cleaned.rfind(closing)
+        if start >= 0 and end > start:
+            candidates.append(cleaned[start : end + 1])
+
+    payload = None
+    last_error: json.JSONDecodeError | None = None
+    for candidate in candidates:
+        normalized = candidate.replace("“", '"').replace("”", '"')
+        normalized = re.sub(r",\s*([}\]])", r"\1", normalized)
+        try:
+            payload = json.loads(normalized)
+            break
+        except json.JSONDecodeError as exc:
+            last_error = exc
+    if payload is None:
+        raise PipelineError("AI khong tra ve JSON hoi thoai hop le.") from last_error
     if isinstance(payload, dict):
         payload = payload.get("segments", [])
     if not isinstance(payload, list):

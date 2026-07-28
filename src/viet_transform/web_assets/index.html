@@ -4,11 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Studio bien tap video review tieng Viet bang AI">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23171713'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='sans-serif' font-size='22' font-weight='700' fill='%23ff5a36'%3EVT%3C/text%3E%3C/svg%3E">
   <title>Viet Transform Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=20260727-2">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260728-15">
 </head>
 <body>
   <div class="noise"></div>
@@ -17,25 +18,29 @@
       <span class="brand-mark">VT</span>
       <span>TRANSFORM<br>STUDIO</span>
     </a>
-    <div class="system-state"><i></i> ENGINE ONLINE</div>
-    <button class="ghost-button" type="button" id="openSettings">9ROUTER CONFIG</button>
+    <nav class="view-nav" aria-label="Điều hướng sản phẩm">
+      <a href="/">Trang chủ</a>
+      <a href="/translate" class="active">Dịch video</a>
+      <a href="/storytelling">Storytelling</a>
+    </nav>
+    <button class="ghost-button" type="button" id="openSettings">Cấu hình 9Router</button>
   </header>
 
   <main>
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">AI VIDEO WORKBENCH / 01</p>
-        <h1>BIẾN THƯỚC PHIM<br><span>THÀNH CÂU CHUYỆN.</span></h1>
-        <p class="lead">Một bàn dựng tự động cho video review tiếng Việt — từ nhận diện lời thoại, viết kịch bản, voice-over đến phụ đề và bản xuất 9:16.</p>
+        <p class="eyebrow">TẠO PROJECT VIDEO MỚI</p>
+        <h1>TỪ VIDEO GỐC<br><span>ĐẾN BÀN DỰNG.</span></h1>
+        <p class="lead">Chọn một video, để AI chuẩn bị lời thoại và cue. Bạn kiểm tra, chỉnh sửa rồi chủ động render khi mọi thứ đã sẵn sàng.</p>
       </div>
-      <div class="hero-stamp"><strong>7</strong><span>STAGE<br>PIPELINE</span></div>
+      <div class="hero-stamp"><strong>01</strong><span>VIDEO<br>MỖI PROJECT</span></div>
     </section>
 
     <form id="studioForm" class="studio-grid">
       <section class="panel source-panel">
         <div class="panel-heading">
           <span class="step-number">01</span>
-          <div><p>NGUỒN TƯ LIỆU</p><h2>Đưa video vào studio</h2></div>
+          <div><p>BƯỚC 1 · NGUỒN VIDEO</p><h2>Chọn video cần biên tập</h2></div>
         </div>
 
         <div class="source-tabs" role="tablist">
@@ -44,11 +49,11 @@
         </div>
         <div class="tab-pane active" id="uploadPane">
           <label class="dropzone" id="dropzone">
-            <input type="file" name="video_file" id="videoFile" accept="video/*" multiple>
+            <input type="file" name="video_file" id="videoFile" accept="video/*">
             <span class="upload-icon">↗</span>
-            <strong id="fileTitle">KÉO TỐI ĐA 10 VIDEO VÀO ĐÂY</strong>
-            <small id="fileMeta">MP4, MOV, WEBM · tối đa 10 video mỗi hàng đợi</small>
-            <span class="browse">CHỌN 1 HOẶC NHIỀU VIDEO TỪ MÁY</span>
+            <strong id="fileTitle">KÉO 1 VIDEO VÀO ĐÂY</strong>
+            <small id="fileMeta">MP4, MOV, WEBM · mỗi project dùng một video</small>
+            <span class="browse">CHỌN VIDEO TỪ MÁY</span>
           </label>
         </div>
         <div class="tab-pane" id="urlPane">
@@ -61,7 +66,7 @@
           <div><strong id="previewName">video.mp4</strong><span>Sẵn sàng xử lý</span></div>
           <button type="button" id="removeVideo" aria-label="Xóa video">×</button>
         </div>
-        <div class="batch-box" id="batchBox">
+        <div class="batch-box" id="batchBox" hidden>
           <div><strong>RENDER HÀNG LOẠT · TỐI ĐA 10 VIDEO</strong><button type="button" id="chooseDraftFolder">CHỌN THƯ MỤC BẢN NHÁP</button></div>
           <small id="draftFolderStatus">Chọn nhiều file trong cửa sổ bằng Ctrl/Shift. Studio xử lý lần lượt và retry mỗi video 5 lần.</small>
           <div id="batchList" class="batch-list"><div class="batch-empty">Chưa có video trong hàng đợi</div></div>
@@ -71,7 +76,7 @@
       <section class="panel controls-panel">
         <div class="panel-heading">
           <span class="step-number">02</span>
-          <div><p>CHỈ ĐẠO HÌNH ẢNH</p><h2>Thiết lập bản dựng</h2></div>
+          <div><p>BƯỚC 2 · KHUNG HÌNH</p><h2>Chọn định dạng đầu ra</h2></div>
         </div>
         <div class="control-grid">
           <label class="field"><span>ĐỘ PHÂN GIẢI</span><select name="resolution"><option value="1080x1920">Shorts · 1080 × 1920</option><option value="720x1280">Preview · 720 × 1280</option><option value="1920x1080">Long-form · 1920 × 1080</option></select></label>
@@ -79,7 +84,7 @@
           <label class="field"><span>LÀM MỜ WATERMARK</span><select name="watermark_position"><option value="top-left" selected>Góc trên trái</option><option value="top-right">Góc trên phải</option><option value="bottom-left">Góc dưới trái</option><option value="bottom-right">Góc dưới phải</option><option value="none">Không xử lý</option></select></label>
           <label class="field"><span>VỊ TRÍ LOGO</span><select name="logo_position"><option value="top-right" selected>Góc trên phải</option><option value="top-left">Góc trên trái</option><option value="bottom-right">Góc dưới phải</option><option value="bottom-left">Góc dưới trái</option></select></label>
           <label class="range-field"><span><b>ZOOM / CROP</b><output id="zoomOut">6%</output></span><input type="range" name="zoom" min="1" max="1.2" step="0.01" value="1.06" data-output="zoomOut" data-format="percentZoom"></label>
-          <label class="range-field"><span><b>CẮT ĐẦU & CUỐI</b><output id="trimOut">0.5s</output></span><input type="range" name="trim_seconds" min="0" max="3" step="0.1" value="0.5" data-output="trimOut" data-format="seconds"></label>
+          <label class="range-field"><span><b>CẮT ĐẦU & CUỐI</b><output id="trimOut">0.0s</output></span><input type="range" name="trim_seconds" min="0" max="3" step="0.1" value="0" data-output="trimOut" data-format="seconds"></label>
           <label class="range-field"><span><b>NHẠC NỀN</b><output id="musicOut">12%</output></span><input type="range" name="music_volume" min="0" max="0.5" step="0.01" value="0.12" data-output="musicOut" data-format="percent"></label>
           <label class="range-field"><span><b>KÍCH THƯỚC LOGO</b><output id="logoWidthOut">16%</output></span><input type="range" name="logo_width" min="0.05" max="0.4" step="0.01" value="0.16" data-output="logoWidthOut" data-format="percent"></label>
           <label class="range-field"><span><b>ĐỘ RÕ LOGO</b><output id="logoOpacityOut">90%</output></span><input type="range" name="logo_opacity" min="0.1" max="1" step="0.05" value="0.9" data-output="logoOpacityOut" data-format="percent"></label>
@@ -92,10 +97,34 @@
         </div>
       </section>
 
-      <section class="panel voice-panel">
+      <section class="panel editorial-panel">
         <div class="panel-heading">
           <span class="step-number">03</span>
-          <div><p>DỊCH & LỒNG TIẾNG</p><h2>Ngôn ngữ đầu ra</h2></div>
+          <div><p>TÙY CHỌN · CÓ THỂ BỎ QUA</p><h2>DNA biên tập của kênh</h2></div>
+        </div>
+        <div class="editorial-generator">
+          <label class="field"><span>CHỦ ĐỀ VIDEO</span><input id="editorialTopic" placeholder="Ví dụ: Livestream bán hàng tại Trung Quốc"></label>
+          <label class="field"><span>MÔ TẢ VIDEO MUỐN LÀM</span><textarea id="editorialDescription" placeholder="Mô tả nội dung nguồn, điều bạn tò mò và điều người xem cần nhận được sau video."></textarea></label>
+        </div>
+        <div class="editorial-style-card">
+          <div class="style-mark">HG</div>
+          <div><strong>Đặt vấn đề → Bằng chứng → Giải thích → Góc nhìn Việt Nam</strong><p>Giọng kể bình tĩnh, sắc và có lập luận. Video nguồn chỉ đóng vai trò tư liệu minh họa.</p></div>
+          <button type="button" id="fillEditorialSample">TẠO DNA BIÊN TẬP</button>
+        </div>
+        <div class="editorial-fields">
+          <label class="field"><span>CHẾ ĐỘ LỜI THOẠI</span><select name="content_mode" id="contentMode"><option value="localization" selected>Dịch và lồng tiếng · theo audio gốc</option><option value="creator-analysis">Lời kể phân tích · không dùng để dịch thoại</option></select><small class="field-note">Mặc định dịch từng câu nói, giữ timestamp gốc và không mô tả cảnh quay.</small></label>
+          <label class="field"><span>LUẬN ĐIỂM CHÍNH · KHÔNG BẮT BUỘC</span><input name="editorial_thesis" id="editorialThesis" placeholder="Bỏ trống để AI tự xác định luận điểm từ nội dung video."></label>
+          <label class="field"><span>GÓC NHÌN DÀNH CHO NGƯỜI VIỆT</span><textarea name="vietnam_angle" id="vietnamAngle" placeholder="Điều gì người xem Việt Nam cần hiểu, so sánh hoặc áp dụng?"></textarea></label>
+          <label class="field"><span>NGUỒN NGHIÊN CỨU · MỖI URL MỘT DÒNG</span><textarea name="research_sources" id="researchSources" placeholder="https://nguon-1...&#10;https://nguon-2..."></textarea><small class="field-note">Nên có ít nhất hai nguồn độc lập ngoài video gốc.</small></label>
+        </div>
+        <div class="editorial-rhythm"><span><b>01</b>Cold open</span><span><b>02</b>Hồ sơ sự việc</span><span><b>03</b>Bằng chứng</span><span><b>04</b>Góc nhìn Việt</span><span><b>05</b>Kết luận mở</span></div>
+        <div class="editorial-brief-result" id="editorialBriefResult" hidden></div>
+      </section>
+
+      <section class="panel voice-panel">
+        <div class="panel-heading">
+          <span class="step-number">04</span>
+          <div><p>BƯỚC 4 · NGÔN NGỮ</p><h2>Chọn giọng kể của kênh</h2></div>
         </div>
         <div class="voice-card">
           <div class="avatar">HM</div>
@@ -110,14 +139,14 @@
       </section>
 
       <section class="launch-panel">
-        <div><span class="ready-dot"></span><strong>STUDIO READY</strong><small>API key chỉ được giữ trong bộ nhớ của tác vụ</small></div>
-        <button type="submit" class="launch-button" id="launchButton"><span>BẮT ĐẦU SẢN XUẤT</span><b>→</b></button>
+        <div><span class="ready-dot"></span><strong>Sẵn sàng tạo project</strong><small>Hệ thống chỉ tạo cue, chưa render video</small></div>
+        <button type="submit" class="launch-button" id="launchButton"><span>TẠO PROJECT CHỈNH SỬA</span><b>→</b></button>
       </section>
     </form>
 
     <section class="production" id="production" hidden>
       <div class="production-head">
-        <div><p class="eyebrow">LIVE PRODUCTION / <span id="jobId">—</span></p><h2>Đang dựng câu chuyện của bạn</h2></div>
+        <div><p class="eyebrow">EDITOR PROJECT / <span id="jobId">—</span></p><h2>Chuẩn bị các track để chỉnh sửa</h2></div>
         <div class="production-actions"><button type="button" id="toggleLogButton">XEM LOG</button><strong id="progressNumber">0%</strong></div>
       </div>
       <div class="progress-track"><i id="progressBar"></i></div>
@@ -125,17 +154,26 @@
       <section class="job-log-panel" id="jobLogPanel" hidden><div class="job-log-head"><strong>NHẬT KÝ XỬ LÝ</strong><button type="button" id="closeLogButton">×</button></div><div class="job-log-list" id="jobLogList"><p>Chưa có log.</p></div></section>
       <div class="error-box" id="errorBox" hidden><span id="errorMessage"></span><button type="button" id="retryJobButton">THỬ LẠI TỪ BLOCK ĐÃ DỪNG</button></div>
       <div class="result-grid" id="resultGrid" hidden>
+        <header class="editor-project-bar">
+          <div class="project-identity"><span>PROJECT</span><strong id="editorProjectName">Video chưa đặt tên</strong></div>
+          <div class="editor-save-state"><i></i><span id="editorSaveState">Các thay đổi được giữ trong project</span></div>
+          <div class="editor-history"><button type="button" disabled aria-label="Hoàn tác">↶</button><button type="button" disabled aria-label="Làm lại">↷</button></div>
+          <button type="button" class="editor-preview-button" onclick="document.querySelector('#resultVideo').play()">XEM TRƯỚC</button>
+          <button type="button" class="apply-editor-button" id="applyEditorButton">XUẤT VIDEO <span>↗</span></button>
+        </header>
         <div class="editor-toolbar">
           <button class="editor-tab active" data-editor-tab="content" title="Nội dung"><b>✎</b><span>Nội dung</span></button>
           <button class="editor-tab" data-editor-tab="subtitles" title="Phụ đề"><b>CC</b><span>Phụ đề</span></button>
           <button class="editor-tab" data-editor-tab="image" title="Hình ảnh"><b>◐</b><span>Hình ảnh</span></button>
-          <button class="editor-tab" data-editor-tab="brand" title="Thương hiệu"><b>◆</b><span>Brand</span></button>
+          <button class="editor-tab" data-editor-tab="pip" title="PIP và lớp phủ"><b>▣</b><span>PIP</span></button>
           <button class="editor-tab" data-editor-tab="audio" title="Âm thanh"><b>♫</b><span>Audio</span></button>
+          <button class="editor-tab" data-editor-tab="brand" title="Thương hiệu"><b>◆</b><span>Brand</span></button>
+          <button class="editor-tab" data-editor-tab="youtube" title="Kiểm tra YouTube"><b>✓</b><span>YouTube</span></button>
           <button class="editor-tab" data-editor-tab="export" title="Xuất"><b>↗</b><span>Xuất</span></button>
         </div>
         <div class="editor-canvas">
           <div class="canvas-top"><span>PREVIEW · 9:16</span><span id="editorTime">00:00 / 00:00</span></div>
-          <div class="video-shell"><video id="resultVideo" controls playsinline></video></div>
+          <div class="video-shell" id="previewStage"><div class="preview-media-frame"><video id="resultVideo" controls playsinline muted></video><audio id="voicePreviewAudio" preload="auto"></audio><div class="preview-vignette" id="previewVignette"></div><div class="subtitle-preview" id="subtitlePreview">Phụ đề xem trước</div></div></div>
         </div>
         <aside class="editor-inspector">
           <div class="editor-pane active" data-editor-pane="content">
@@ -144,7 +182,7 @@
             <div class="cue-editor-list" id="cueEditorList"></div>
             <textarea id="scriptEditor" aria-label="Bản dịch subtitle" hidden></textarea>
             <p class="editor-note">Chỉnh nội dung, mốc thời gian và giọng riêng từng đoạn. Timeline không cho phép các cue chồng nhau.</p>
-            <button type="button" class="regenerate-button" id="regenerateButton">ÁP DỤNG TIMELINE & RENDER <span>↻</span></button>
+            <button type="button" class="regenerate-button" id="regenerateButton" hidden>LƯU TIMELINE <span>✓</span></button>
           </div>
           <div class="editor-pane" data-editor-pane="subtitles">
             <h3>STYLE PHỤ ĐỀ</h3>
@@ -156,10 +194,18 @@
           </div>
           <div class="editor-pane" data-editor-pane="image">
             <h3>CHỈNH HÌNH ẢNH</h3>
+            <label class="field"><span>PRESET MÀU</span><select id="editColorPreset"><option value="custom">Tùy chỉnh</option><option value="original">Nguyên bản</option><option value="cinematic">Điện ảnh</option><option value="warm">Ấm áp</option><option value="cool">Lạnh</option><option value="mono">Đen trắng</option><option value="vivid">Rực rỡ</option></select></label>
             <label class="range-field"><span><b>ĐỘ SÁNG</b><output id="editBrightnessOut">0</output></span><input id="editBrightness" type="range" min="-1" max="1" step="0.05" value="0"></label>
             <label class="range-field"><span><b>TƯƠNG PHẢN</b><output id="editContrastOut">1.00</output></span><input id="editContrast" type="range" min="0.5" max="2" step="0.05" value="1"></label>
             <label class="range-field"><span><b>BÃO HÒA</b><output id="editSaturationOut">1.00</output></span><input id="editSaturation" type="range" min="0" max="3" step="0.05" value="1"></label>
-            <p class="editor-note">Các thông số áp dụng lên toàn bộ track video khi render master.</p>
+            <label class="range-field"><span><b>TÔNG MÀU</b><output id="editHueOut">0°</output></span><input id="editHue" type="range" min="-180" max="180" step="5" value="0"></label>
+            <label class="range-field"><span><b>LÀM MỜ</b><output id="editBlurOut">0</output></span><input id="editBlur" type="range" min="0" max="10" step="0.5" value="0"></label>
+            <label class="range-field"><span><b>VIỀN TỐI</b><output id="editVignetteOut">0%</output></span><input id="editVignette" type="range" min="0" max="1" step="0.05" value="0"></label>
+            <p class="editor-note">Preview thay đổi trực tiếp. Các thông số giống nhau sẽ được áp dụng khi render MP4.</p>
+          </div>
+          <div class="editor-pane" data-editor-pane="pip">
+            <h3>PIP & LỚP PHỦ</h3>
+            <div class="empty-tool-state"><b>▣</b><strong>Chưa có khung PIP</strong><p>Video hoặc ảnh chèn sẽ xuất hiện trên track PIP và có thể đặt lại vị trí trong khung hình.</p><button type="button" disabled>THÊM PIP · SẮP CÓ</button></div>
           </div>
           <div class="editor-pane" data-editor-pane="brand">
             <h3>THƯƠNG HIỆU</h3>
@@ -169,24 +215,58 @@
           </div>
           <div class="editor-pane" data-editor-pane="audio">
             <h3>ÂM THANH</h3>
+            <div class="voice-sync-status"><i></i><div><strong>VOICE PREVIEW ĐỒNG BỘ</strong><p>Phát video để nghe giọng đọc và xem phụ đề trên cùng timeline.</p></div></div>
             <label class="range-field"><span><b>VOICE</b><output id="editVoiceOut">100%</output></span><input id="editVoiceVolume" type="range" min="0" max="2" step="0.05" value="1"></label>
             <label class="range-field"><span><b>NHẠC NỀN</b><output id="editMusicOut">12%</output></span><input id="editMusicVolume" type="range" min="0" max="0.5" step="0.01" value="0.12"></label>
             <label class="range-field"><span><b>FADE IN</b><output id="editFadeInOut">0.0s</output></span><input id="editFadeIn" type="range" min="0" max="5" step="0.25" value="0"></label>
             <label class="range-field"><span><b>FADE OUT</b><output id="editFadeOutOut">0.0s</output></span><input id="editFadeOut" type="range" min="0" max="5" step="0.25" value="0"></label>
             <p class="editor-note">Voice được chuẩn hóa -16 LUFS và tự động ducking nhạc.</p>
           </div>
-          <div class="editor-pane" data-editor-pane="export">
-            <h3>MASTER EXPORT</h3>
-            <p>Render MP4 H.264, AAC và tối ưu phát nhanh trên web.</p>
-            <button type="button" id="downloadButton" class="download-button">LƯU VIDEO VỀ MÁY <span>↓</span></button>
+          <div class="editor-pane youtube-pane" data-editor-pane="youtube">
+            <div class="readiness-heading"><div class="readiness-score" id="readinessScore"><strong>--</strong><span>/100</span></div><div><h3>YOUTUBE READINESS</h3><p id="readinessVerdict">Kiểm tra project trước khi xuất bản</p></div></div>
+            <div class="readiness-path" aria-label="Đường kiểm tra YouTube">
+              <span data-readiness-gate="rights"><b>1</b>Quyền sử dụng</span>
+              <span data-readiness-gate="transform"><b>2</b>Giá trị mới</span>
+              <span data-readiness-gate="editorial"><b>3</b>Biên tập</span>
+              <span data-readiness-gate="publish"><b>4</b>Xuất bản</span>
+            </div>
+            <label class="field"><span>CƠ SỞ QUYỀN SỬ DỤNG</span><select id="rightsBasis"><option value="unknown">Chưa xác định</option><option value="owned">Tự sở hữu</option><option value="licensed">Được cấp phép bằng văn bản</option><option value="creative-commons">Creative Commons phù hợp</option><option value="public-domain">Public domain</option><option value="stock">Stock có quyền thương mại</option><option value="case-review">Cần thẩm định từng trường hợp</option></select></label>
+            <div class="readiness-answers">
+              <label><input type="checkbox" id="evidenceSaved"><span>Đã lưu bằng chứng quyền sử dụng</span></label>
+              <label><input type="checkbox" id="originalCommentary"><span>Có lời bình hoặc phân tích riêng</span></label>
+              <label><input type="checkbox" id="multipleSources"><span>Nghiên cứu từ nhiều nguồn</span></label>
+              <label><input type="checkbox" id="factChecked"><span>Đã kiểm chứng dữ kiện</span></label>
+              <label><input type="checkbox" id="syntheticDisclosure"><span>Đã xem xét khai báo nội dung AI</span></label>
+              <label><input type="checkbox" id="advertiserReview"><span>Đã rà soát tính thân thiện quảng cáo</span></label>
+              <label><input type="checkbox" id="thumbnailAccurate"><span>Thumbnail mô tả đúng nội dung</span></label>
+              <label><input type="checkbox" id="metadataReady"><span>Tiêu đề và metadata đã sẵn sàng</span></label>
+              <label><input type="checkbox" id="endScreenReady"><span>Đã chuẩn bị end screen</span></label>
+            </div>
+            <button type="button" class="readiness-check-button" id="checkReadinessButton">KIỂM TRA PROJECT</button>
+            <div class="readiness-results" id="readinessResults"><p>Hãy trả lời checklist để nhận đường sửa cụ thể.</p></div>
+            <p class="readiness-disclaimer" id="readinessDisclaimer"></p>
           </div>
-          <button type="button" class="apply-editor-button" id="applyEditorButton">ÁP DỤNG & RENDER LẠI</button>
+          <div class="editor-pane" data-editor-pane="export">
+            <h3>TÀI NGUYÊN PROJECT</h3>
+            <p>Tải riêng từng track để đưa vào CapCut và tiếp tục chỉnh sửa mà không cần render trước.</p>
+            <div class="project-asset-downloads">
+              <a id="downloadProjectVideo" class="project-asset-button disabled" aria-disabled="true"><b>V1</b><span>VIDEO NỀN<small>MP4 · không burn phụ đề</small></span><i>↓</i></a>
+              <a id="downloadProjectVoice" class="project-asset-button disabled" aria-disabled="true"><b>A1</b><span>GIỌNG ĐỌC<small>MP3 · đúng timeline cue</small></span><i>↓</i></a>
+              <a id="downloadProjectSubtitles" class="project-asset-button disabled" aria-disabled="true"><b>CC</b><span>PHỤ ĐỀ<small>SRT · đồng bộ giọng đọc</small></span><i>↓</i></a>
+            </div>
+            <h3 class="master-export-heading">MASTER EXPORT</h3>
+            <p>Chỉ render toàn bộ video khi bạn đã chỉnh sửa xong trong Studio.</p>
+            <button type="button" id="downloadButton" class="download-button" disabled>CHƯA CÓ BẢN RENDER <span>↓</span></button>
+          </div>
         </aside>
         <div class="editor-timeline">
+          <div class="timeline-head"><strong>TIMELINE</strong><span>Click một cue để xem đúng vị trí</span></div>
           <div class="timeline-ruler"><span>00:00</span><span>25%</span><span>50%</span><span>75%</span><span>END</span></div>
-          <div class="timeline-track video-track"><b>V1</b><div class="track-clip">VIDEO MASTER</div></div>
+          <div class="timeline-track video-track"><b>V1</b><div class="track-clip">VIDEO SOURCE · KHUNG CHÍNH</div></div>
+          <div class="timeline-track pip-track"><b>PIP</b><div class="track-clip empty-clip">CHƯA CÓ LỚP PHỦ</div></div>
           <div class="timeline-track subtitle-track"><b>CC</b><div class="cue-lane" id="cueTimeline"></div></div>
-          <div class="timeline-track audio-track"><b>A1</b><div class="track-clip audio-clip">VOICE + MUSIC</div></div>
+          <div class="timeline-track audio-track"><b>A1</b><div class="track-clip audio-clip">VOICE · TẠO KHI RENDER</div></div>
+          <div class="timeline-track music-track"><b>A2</b><div class="track-clip music-clip">NHẠC NỀN</div></div>
         </div>
       </div>
     </section>
@@ -212,6 +292,6 @@
     </form>
   </dialog>
   <div class="toast" id="toast"></div>
-  <script src="/assets/app.js?v=20260728-1"></script>
+  <script src="/assets/app.js?v=20260728-15"></script>
 </body>
 </html>

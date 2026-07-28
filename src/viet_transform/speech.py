@@ -76,6 +76,7 @@ def synthesize_dialogue(
     settings: Settings,
     work_dir: Path,
     detail: Callable[[str], None] | None = None,
+    voice_driven_timeline: bool = False,
 ) -> Path:
     clips_dir = work_dir / "voice-clips"
     clips_dir.mkdir(parents=True, exist_ok=True)
@@ -143,6 +144,21 @@ def synthesize_dialogue(
                 time.sleep(3.0)
         clip_duration = duration(clip)
         clips.append((clip, chunk, clip_duration))
+
+    if voice_driven_timeline:
+        available_duration = max(line.end for line in lines)
+        raw_duration = sum(clip_duration for _, _, clip_duration in clips)
+        scale = min(1.0, available_duration / raw_duration) if raw_duration else 1.0
+        cursor = 0.0
+        retimed: list[tuple[Path, SpeechChunk, float]] = []
+        spoken_lines = [line for line in lines if line.translation.strip()]
+        for line, (clip, chunk, clip_duration) in zip(spoken_lines, clips, strict=True):
+            slot_duration = max(0.4, clip_duration * scale)
+            line.start = cursor
+            line.end = cursor + slot_duration
+            retimed.append((clip, replace(chunk, start=line.start, end=line.end), clip_duration))
+            cursor = line.end
+        clips = retimed
 
     total_duration = max(line.end for line in lines) + 0.5
     _assemble_timeline(clips, output, work_dir, total_duration, detail=detail)

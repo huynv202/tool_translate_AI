@@ -29,6 +29,10 @@ class PipelineOptions:
     seed: int | None = None
     resume: bool = True
     target_language: str = "Vietnamese"
+    content_mode: str = "localization"
+    editorial_thesis: str = ""
+    vietnam_angle: str = ""
+    research_sources: tuple[str, ...] = ()
     render: RenderOptions = field(default_factory=RenderOptions)
 
 
@@ -52,7 +56,7 @@ def _write_text(path: Path, content: str) -> Path:
     return path
 
 
-def execute(
+def prepare(
     options: PipelineOptions,
     settings: Settings,
     progress: ProgressCallback | None = None,
@@ -92,32 +96,70 @@ def execute(
             script_file,
             settings,
             options.target_language,
+            options.content_mode,
+            options.editorial_thesis,
+            options.vietnam_angle,
+            options.research_sources,
         ),
         progress,
     )
+    return source
+
+
+def prepare_render_assets(
+    options: PipelineOptions,
+    settings: Settings,
+    progress: ProgressCallback | None = None,
+    detail: Callable[[str], None] | None = None,
+) -> tuple[Path, Path]:
+    translated_dialogue = options.work_dir / "dialogue.translated.json"
+    if not translated_dialogue.is_file():
+        raise FileNotFoundError("Thieu artifact de tao voice: dialogue.translated.json")
     timed_lines = _shift_dialogue(
         load_dialogue(translated_dialogue), options.render.trim_seconds
     )
-    voiceover = _stage(
-        options.work_dir / "voiceover.mp3",
-        "Tao giong doc",
-        options.resume,
-        lambda: synthesize_dialogue(
+    def synthesize_voice() -> Path:
+        result = synthesize_dialogue(
             timed_lines,
             options.work_dir / "voiceover.mp3",
             settings,
             options.work_dir,
             detail,
-        ),
+            voice_driven_timeline=options.content_mode == "creator-analysis",
+        )
+        if options.content_mode == "creator-analysis":
+            save_dialogue(timed_lines, translated_dialogue)
+            _write_text(options.work_dir / "script.translated.txt", dialogue_script(timed_lines))
+        return result
+
+    _stage(
+        options.work_dir / "voiceover.mp3",
+        "Tao giong doc",
+        options.resume,
+        synthesize_voice,
         progress,
     )
-    subtitles = _stage(
+    _stage(
         options.work_dir / "voiceover.srt",
         "Tao phu de",
         options.resume,
         lambda: _write_text(options.work_dir / "voiceover.srt", dialogue_srt(timed_lines)),
         progress,
     )
+    return options.work_dir / "voiceover.mp3", options.work_dir / "voiceover.srt"
+
+
+def render_prepared(
+    options: PipelineOptions,
+    settings: Settings,
+    progress: ProgressCallback | None = None,
+) -> Path:
+    source = options.work_dir / "source.mp4"
+    voiceover = options.work_dir / "voiceover.mp3"
+    subtitles = options.work_dir / "voiceover.srt"
+    for path in (source, voiceover, subtitles):
+        if not path.is_file() or not path.stat().st_size:
+            raise FileNotFoundError(f"Thieu artifact de render: {path.name}")
     music = options.music or choose_music(settings.music_dir, options.seed)
     LOG.info("Nhac nen: %s", music or "khong co")
     LOG.info("[run]  Render video")
@@ -136,6 +178,17 @@ def execute(
     if progress:
         progress("Render video", "completed")
     return result
+
+
+def execute(
+    options: PipelineOptions,
+    settings: Settings,
+    progress: ProgressCallback | None = None,
+    detail: Callable[[str], None] | None = None,
+) -> Path:
+    prepare(options, settings, progress, detail)
+    prepare_render_assets(options, settings, progress, detail)
+    return render_prepared(options, settings, progress)
 
 
 def _extract_source_dialogue(
@@ -159,9 +212,20 @@ def _translate_dialogue(
     script_file: Path,
     settings: Settings,
     target_language: str,
+    content_mode: str,
+    editorial_thesis: str,
+    vietnam_angle: str,
+    research_sources: tuple[str, ...],
 ) -> Path:
     lines = ai.translate_dialogue(
-        load_dialogue(source), settings, target_language, output.parent / "ai-cache"
+        load_dialogue(source),
+        settings,
+        target_language=target_language,
+        cache_dir=output.parent / "ai-cache",
+        content_mode=content_mode,
+        editorial_thesis=editorial_thesis,
+        vietnam_angle=vietnam_angle,
+        research_sources=research_sources,
     )
     _write_text(script_file, dialogue_script(lines))
     return save_dialogue(lines, output)

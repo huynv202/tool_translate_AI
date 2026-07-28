@@ -12,7 +12,7 @@ from .subtitles import escape_filter_path
 class RenderOptions:
     width: int = 1080
     height: int = 1920
-    trim_seconds: float = 0.5
+    trim_seconds: float = 0.0
     zoom: float = 1.06
     flip: bool = True
     music_volume: float = 0.12
@@ -30,6 +30,9 @@ class RenderOptions:
     brightness: float = 0.0
     contrast: float = 1.0
     saturation: float = 1.0
+    hue: float = 0.0
+    blur: float = 0.0
+    vignette: float = 0.0
     voice_volume: float = 1.0
     audio_fade_in: float = 0.0
     audio_fade_out: float = 0.0
@@ -62,24 +65,30 @@ def render(
         f"crop={options.width}:{options.height}",
         f"eq=brightness={options.brightness}:contrast={options.contrast}:saturation={options.saturation}",
     ]
+    if options.hue:
+        video_filters.append(f"hue=h={options.hue}")
+    if options.blur:
+        video_filters.append(f"gblur=sigma={options.blur}")
+    if options.vignette:
+        video_filters.append(f"vignette=PI/{max(2.0, 12.0 - options.vignette * 8):.2f}")
     if options.watermark_position != "none":
         video_filters.append(_watermark_filter(options))
     if options.flip:
         video_filters.append("hflip")
     if options.cover_source_subtitles:
-        video_filters.append(
-            f"drawbox=x=0:y=ih*0.80:w=iw:h=ih*0.16:color=black@{options.caption_opacity}:t=fill"
-        )
+        video_filters.append(_caption_band_filter(options))
     subtitle_colors = {
         "white": "&H00FFFFFF",
         "yellow": "&H0000FFFF",
         "cyan": "&H00FFFF00",
     }
     primary_color = subtitle_colors.get(options.subtitle_color, subtitle_colors["white"])
+    background_alpha = round((1 - options.caption_opacity) * 255)
     style = (
         f"FontName={font_name},FontSize={options.subtitle_font_size},Bold=1,"
         f"PrimaryColour={primary_color},"
-        "OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,"
+        f"BackColour=&H{background_alpha:02X}000000,"
+        "OutlineColour=&H00000000,BorderStyle=3,Outline=3,Shadow=0,"
         f"Alignment=2,MarginV={options.subtitle_margin}"
     )
     video_filters.append(
@@ -145,6 +154,15 @@ def _overlay_position(position: str) -> tuple[str, str]:
     if position not in positions:
         raise PipelineError("Vi tri logo khong hop le.")
     return positions[position]
+
+
+def _caption_band_filter(options: RenderOptions) -> str:
+    band_height = max(72, options.subtitle_font_size * 6)
+    band_y = max(0, options.height - options.subtitle_margin - band_height)
+    return (
+        f"drawbox=x=0:y={band_y}:w=iw:h={band_height}:"
+        f"color=black@{options.caption_opacity}:t=fill"
+    )
 
 
 def _watermark_filter(options: RenderOptions) -> str:

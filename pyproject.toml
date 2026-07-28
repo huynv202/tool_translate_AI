@@ -12,6 +12,7 @@ dependencies = [
   "edge-tts>=7.0.0",
   "fastapi>=0.115.0",
   "faster-whisper>=1.1.1",
+  "google-genai>=1.30.0",
   "openai>=1.70.0",
   "piper-tts>=1.6.0",
   "python-dotenv>=1.0.1",

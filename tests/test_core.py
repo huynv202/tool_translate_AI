@@ -3,7 +3,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from viet_transform.ai import _cached_json_completion, _validate_script
+from viet_transform.ai import (
+    _cached_json_completion,
+    _translate_batch,
+    _validate_script,
+    adapt_dialogue,
+    translate_dialogue,
+)
 from viet_transform.dialogue import DialogueLine, apply_script, dialogue_srt, parse_json_response
 from viet_transform.errors import PipelineError
 from viet_transform.local_stt import (
@@ -24,6 +30,43 @@ from viet_transform.video import RenderOptions, _overlay_position, _watermark_fi
 def test_source_detection() -> None:
     assert is_url("https://example.com/video")
     assert not is_url("./clip.mp4")
+
+
+def test_gemini_media_saves_generated_image(monkeypatch, tmp_path: Path) -> None:
+    from viet_transform.gemini_media import generate_scene_image
+
+    generated = SimpleNamespace(image=SimpleNamespace(image_bytes=b"png"), rai_filtered_reason=None)
+    models = SimpleNamespace(generate_images=lambda **kwargs: SimpleNamespace(generated_images=[generated]))
+    monkeypatch.setattr("viet_transform.gemini_media.genai.Client", lambda **kwargs: SimpleNamespace(models=models))
+
+    output = generate_scene_image("key", "imagen-model", "scene prompt", tmp_path / "scene.png", "9:16")
+
+    assert output.read_bytes() == b"png"
+
+
+def test_gemini_media_polls_and_saves_generated_video(monkeypatch, tmp_path: Path) -> None:
+    from viet_transform.gemini_media import generate_scene_video
+
+    pending = SimpleNamespace(done=False, error=None, response=None, result=None)
+    finished = SimpleNamespace(
+        done=True, error=None,
+        response=SimpleNamespace(generated_videos=[SimpleNamespace(video=SimpleNamespace(video_bytes=b"mp4"))]),
+        result=None,
+    )
+    client = SimpleNamespace(
+        models=SimpleNamespace(generate_videos=lambda **kwargs: pending),
+        operations=SimpleNamespace(get=lambda operation: finished),
+        files=SimpleNamespace(download=lambda **kwargs: b""),
+    )
+    monkeypatch.setattr("viet_transform.gemini_media.genai.Client", lambda **kwargs: client)
+    monkeypatch.setattr("viet_transform.gemini_media.time.sleep", lambda _: None)
+
+    output = generate_scene_video(
+        "key", "video-model", "scene prompt", tmp_path / "scene.mp4", "9:16",
+        poll_interval=0,
+    )
+
+    assert output.read_bytes() == b"mp4"
 
 
 def test_normalize_srt() -> None:
@@ -131,7 +174,9 @@ def test_render_applies_editor_subtitle_style(
         "Montserrat",
         options=RenderOptions(
             subtitle_font_size=16,
+            subtitle_margin=240,
             subtitle_color="yellow",
+            caption_opacity=0.6,
             brightness=0.1,
             contrast=1.2,
             saturation=1.3,
@@ -142,13 +187,38 @@ def test_render_applies_editor_subtitle_style(
     )
     command = " ".join(captured)
     assert "FontSize=16" in command
+    assert "Alignment=2,MarginV=240" in command
     assert "PrimaryColour=&H0000FFFF" in command
+    assert "BackColour=&H66000000" in command
+    assert "BorderStyle=3" in command
+    assert "drawbox=x=0:y=1584:w=iw:h=96:color=black@0.6:t=fill" in command
     assert "eq=brightness=0.1:contrast=1.2:saturation=1.3" in command
     assert "volume=0.8" in command
     assert "afade=t=in:st=0:d=1.0" in command
     assert "afade=t=out:st=8.500:d=1.5" in command
     assert "veryfast" in captured
     assert "128k" in captured
+
+
+def test_render_applies_editor_effects(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "source.mp4"
+    voice = tmp_path / "voice.mp3"
+    subtitles = tmp_path / "voice.srt"
+    for path in (source, voice, subtitles):
+        path.write_bytes(b"data")
+    captured: list[str] = []
+    monkeypatch.setattr("viet_transform.video.duration", lambda _: 10.0)
+    monkeypatch.setattr("viet_transform.video.run", lambda command: captured.extend(command))
+
+    render(
+        source, voice, subtitles, tmp_path / "final.mp4", "Montserrat",
+        options=RenderOptions(hue=15, blur=2.5, vignette=0.5),
+    )
+
+    command = " ".join(captured)
+    assert "hue=h=15" in command
+    assert "gblur=sigma=2.5" in command
+    assert "vignette=PI/8.00" in command
 
 
 def test_ai_batch_cache_avoids_duplicate_router_call(
@@ -227,6 +297,213 @@ def test_dialogue_json_accepts_wrapped_payload() -> None:
     assert result[0]["translation"] == "Xin chào"
 
 
+def test_dialogue_json_recovers_text_and_trailing_comma() -> None:
+    result = parse_json_response(
+        'Đây là kết quả: {“segments”:[{“id”:1,“translation”:“Xin chào”,}],} cảm ơn.'
+    )
+    assert result == [{"id": 1, "translation": "Xin chào"}]
+
+
+def test_ai_json_completion_retries_invalid_response(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from viet_transform.config import Settings
+
+    responses = iter([
+        "Tôi không thể trả JSON",
+        '{"segments":[{"id":1,"translation":"Xin chào"}]}',
+    ])
+
+    class Completions:
+        def create(self, **kwargs):
+            message = SimpleNamespace(content=next(responses))
+            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
+    monkeypatch.setattr("viet_transform.ai._client", lambda _: client)
+    settings = Settings(
+        None, "http://localhost/v1", "gemini-test", "claude-test", "small",
+        "vi-piper-vais1000-medium", "+0%", "piper", None, None, tmp_path, "Montserrat",
+    )
+
+    result = _cached_json_completion(
+        settings, "gemini-test", "prompt", "payload", 0.2, None, "translate"
+    )
+
+    assert result[0]["translation"] == "Xin chào"
+
+
+def test_editorial_context_normalizes_paths_before_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from viet_transform.config import Settings
+
+    captured: list[str] = []
+
+    def completion(*args, **kwargs):
+        captured.append(args[3])
+        return [{"id": 1, "translation": "Loi dan moi"}]
+
+    monkeypatch.setattr("viet_transform.ai._cached_json_completion", completion)
+    settings = Settings(
+        "key", "http://localhost/v1", "gemini-test", "claude-test", "small",
+        "voice", "+0%", "piper", None, None, tmp_path, "Montserrat",
+    )
+    lines = [DialogueLine(1, 0, 2, "source", "ban dich")]
+
+    result = adapt_dialogue(
+        lines, settings, content_mode="creator-analysis",
+        editorial_thesis=tmp_path / "thesis", research_sources=(tmp_path / "source",),
+    )
+
+    assert result[0].translation == "Loi dan moi"
+    assert str(tmp_path / "thesis") in captured[0]
+
+
+def test_translation_splits_bad_json_and_falls_back_per_cue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from viet_transform.config import Settings
+
+    monkeypatch.setattr(
+        "viet_transform.ai._cached_json_completion",
+        lambda *args, **kwargs: (_ for _ in ()).throw(PipelineError("AI khong tra ve JSON hop le")),
+    )
+    monkeypatch.setattr(
+        "viet_transform.ai._plain_text_completion",
+        lambda settings, model, prompt, content: "Ban dich fallback",
+    )
+    settings = Settings(
+        "key", "http://localhost/v1", "gemini-test", "claude-test", "small",
+        "voice", "+0%", "piper", None, None, tmp_path, "Montserrat",
+    )
+    lines = [
+        DialogueLine(1, 0, 1, "mot", ""),
+        DialogueLine(2, 1, 2, "hai", ""),
+    ]
+
+    result = _translate_batch(lines, settings, "Vietnamese")
+
+    assert result == [
+        {"id": 1, "translation": "Ban dich fallback"},
+        {"id": 2, "translation": "Ban dich fallback"},
+    ]
+
+
+def test_translation_retries_valid_json_that_omits_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    from viet_transform.config import Settings
+
+    calls: list[list[int]] = []
+
+    def incomplete_completion(*args, **kwargs):
+        source = json.loads(args[3].split("\n", 1)[1])
+        ids = [item["id"] for item in source]
+        calls.append(ids)
+        returned = ids[:-1] if len(ids) > 1 else ids
+        return [{"id": cue_id, "translation": f"Cue {cue_id}"} for cue_id in returned]
+
+    monkeypatch.setattr("viet_transform.ai._cached_json_completion", incomplete_completion)
+    settings = Settings(
+        "key", "http://localhost/v1", "gemini-test", "claude-test", "small",
+        "voice", "+0%", "piper", None, None, tmp_path, "Montserrat",
+    )
+    lines = [DialogueLine(index, index - 1, index, f"source {index}", "") for index in range(1, 5)]
+
+    result = _translate_batch(lines, settings, "Vietnamese")
+
+    assert [item["id"] for item in result] == [1, 2, 3, 4]
+    assert calls[0] == [1, 2, 3, 4]
+    assert [4] in calls
+
+
+def test_translation_merges_short_sentence_particle_without_adaptation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from viet_transform.config import Settings
+
+    monkeypatch.setattr(
+        "viet_transform.ai._translate_batch",
+        lambda *args, **kwargs: [
+            {"id": 92, "translation": "Mặt trời mọc đằng Tây à?"},
+            {"id": 93, "translation": ""},
+        ],
+    )
+    monkeypatch.setattr(
+        "viet_transform.ai.adapt_dialogue",
+        lambda *args, **kwargs: pytest.fail("Localization must not rewrite translated dialogue"),
+    )
+    settings = Settings(
+        "key", "http://localhost/v1", "gemini-test", "claude-test", "small",
+        "voice", "+0%", "piper", None, None, tmp_path, "Montserrat",
+    )
+    lines = [
+        DialogueLine(92, 472.71, 474.51, "这太阳是不是打西边水", ""),
+        DialogueLine(93, 474.51, 474.91, "了", ""),
+    ]
+
+    result = translate_dialogue(lines, settings, content_mode="localization")
+
+    assert len(result) == 1
+    assert result[0].translation == "Mặt trời mọc đằng Tây à?"
+    assert result[0].end == 474.91
+
+
+def test_creator_analysis_repairs_empty_cue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from viet_transform.config import Settings
+
+    monkeypatch.setattr(
+        "viet_transform.ai._creator_analysis_batch",
+        lambda *args, **kwargs: [{"id": 93, "translation": ""}],
+    )
+    monkeypatch.setattr(
+        "viet_transform.ai._plain_text_completion",
+        lambda *args, **kwargs: "Lời biên tập đã được khôi phục.",
+    )
+    settings = Settings(
+        "key", "http://localhost/v1", "gemini-test", "claude-test", "small",
+        "voice", "+0%", "piper", None, None, tmp_path, "Montserrat",
+    )
+    lines = [DialogueLine(93, 10.0, 12.0, "证据就在这里", "")]
+
+    result = translate_dialogue(lines, settings, content_mode="creator-analysis")
+
+    assert result[0].translation == "Lời biên tập đã được khôi phục."
+
+
+def test_adaptation_repairs_empty_cue_from_literal_translation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from viet_transform.config import Settings
+
+    monkeypatch.setattr(
+        "viet_transform.ai._cached_json_completion",
+        lambda *args, **kwargs: [{"id": 1, "translation": ""}],
+    )
+    captured: dict[str, str] = {}
+
+    def fallback(*args, **kwargs):
+        captured["content"] = args[3]
+        return "Câu biên tập thay thế"
+
+    monkeypatch.setattr("viet_transform.ai._plain_text_completion", fallback)
+    settings = Settings(
+        "key", "http://localhost/v1", "gemini-test", "claude-test", "small",
+        "voice", "+0%", "piper", None, None, tmp_path, "Montserrat",
+    )
+    lines = [DialogueLine(1, 0.0, 2.0, "你好", "Xin chào")]
+
+    result = adapt_dialogue(lines, settings)
+
+    assert result[0].translation == "Câu biên tập thay thế"
+    assert '"literal_translation":"Xin chào"' in captured["content"]
+
+
 def test_embedded_srt_is_parsed_with_from_to() -> None:
     content = (
         "1\n00:00:01,250 --> 00:00:03,500\n<i>你好</i>\n\n"
@@ -302,3 +579,31 @@ def test_xtts_auto_falls_back_to_piper_instead_of_edge(
     assert called == ["Xin chao"]
     filter_script = Path(command[command.index("-filter_complex_script") + 1])
     assert "concat=n=1:v=0:a=1" in filter_script.read_text(encoding="utf-8")
+
+
+def test_voice_driven_timeline_retimes_subtitles_to_tts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from viet_transform.config import Settings
+
+    lines = [
+        DialogueLine(1, 0, 2, "source", "Cau mot"),
+        DialogueLine(2, 2, 4, "source", "Cau hai"),
+    ]
+    settings = Settings(
+        "key", "http://localhost/v1", "gemini", "gpt", "small",
+        "vi-piper-vais1000-medium", "+0%", "piper", None, None, tmp_path, "Montserrat",
+    )
+    monkeypatch.setattr(
+        "viet_transform.speech.synthesize_piper",
+        lambda text, output, *args, **kwargs: output.write_bytes(b"audio"),
+    )
+    monkeypatch.setattr("viet_transform.speech.duration", lambda _: 1.25)
+    monkeypatch.setattr("viet_transform.speech.run", lambda _: None)
+
+    synthesize_dialogue(
+        lines, tmp_path / "voice.mp3", settings, tmp_path,
+        voice_driven_timeline=True,
+    )
+
+    assert [(line.start, line.end) for line in lines] == [(0.0, 1.25), (1.25, 2.5)]
